@@ -4,6 +4,8 @@ import json
 import time 
 import random
 
+from functools import wraps
+
 from botasaurus.browser import Driver
 
 from botasaurus_driver.driver import Element
@@ -14,7 +16,7 @@ from .exceptions import DriverError
 
 from .decorators import no_print, errors
 
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Union, Literal
 from datetime import datetime
 
 
@@ -154,3 +156,31 @@ class Scraper:
     @errors(**ERRORS_CONFIG)
     def get_details(self, listing: Listing) -> Restaurant:
         raise NotImplementedError("You must implement get_details")
+    
+    
+def scraper(mode: Union[Literal["restaurant_details", "restaurant_links"], str], input: str):
+    def decorator(func):
+        @wraps(func)
+        def wrapper(self, *args, **kwargs):
+            try:
+                results = []
+                self.logger.debug(f"Running scraper mode \"{mode}\"")
+                
+                links = self.read(filename=input)
+                
+                self.open()
+                
+                for link in links:
+                    listing: Listing = self.create_listing(data=link)
+                    self.logger.debug(f"Scraping {listing}")
+                    
+                    result = func(self, listing, *args, **kwargs)
+                    if result:
+                        results += result if isinstance(result, list) else [result]
+
+                    
+                self.save(results)
+            finally:
+                self.close()
+        return wrapper
+    return decorator
