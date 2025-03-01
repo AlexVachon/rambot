@@ -1,3 +1,4 @@
+#botminator/scraper.py
 from botasaurus.browser import Driver
 from botasaurus_driver.core.config import Config
 
@@ -5,104 +6,92 @@ from botasaurus_driver.driver import Element
 
 from .config import ScraperConfig
 from .exceptions import DriverError
-from typing import Optional
 
-import asyncio
+from .decorators import no_print, errors
+
+from typing import Optional, List, Type
+
+from loguru import logger as default_logger
+
+logger = default_logger
 
 class Scraper:
-    def __init__(self, config: Config = None):
-        """
-        Initialise le scraper avec une configuration.
+    def __init__(self, config: Config = None, create_error_logs: bool = False, must_raise: List[Type[Exception]] = None):
+        if must_raise is None:
+            must_raise = [Exception]
         
-        Args:
-            config: Dictionnaire de configuration optionnel
-        """
+        self.create_error_logs = create_error_logs
         self.config = ScraperConfig(**(config or {}))
+
         self._driver: Optional[Driver] = None
 
+        self.logger = logger
+
     @property
-    async def driver(self) -> Optional[Driver]:
-        """
-        Propriété asynchrone pour accéder au driver.
-        
-        Assure que le driver est initialisé avant son utilisation.
-        """
+    def driver(self) -> Optional[Driver]:
         if not hasattr(self, '_driver') or not self._driver:
-            await self.open()
+            self.open()
         return self._driver
 
-    async def open(self, wait: bool = True) -> None:
-        """
-        Initialise le driver avec la configuration et affiche le navigateur.
+    def error_decorator(self):
+        return errors(
+            must_raise=self.must_raise,
+            create_logs=self.create_error_logs
+        )
+
+    @no_print
+    @error_decorator
+    def open(self, wait: bool = True) -> None:
+        raise DriverError("Oops! something wrong happened ...")
+        driver_config = {
+            "headless": False,
+            # "proxy": "",
+            # "profile": None,
+            # "tiny_profile": False,
+            # "block_images": False,
+            # "block_images_and_css": False,
+            "wait_for_complete_page_load": wait,
+            # "extensions": [],
+            "arguments": [
+                "--ignore-certificate-errors",
+                "--ignore-ssl-errors=yes"
+            ],
+            # "user_agent": None,
+            # "lang": "en",
+            # "beep": False
+        }
+        self._driver = Driver(**driver_config)
         
-        Args:
-            wait: Attendre le chargement complet de la page
-        """
-        try:
-            driver_config = {
-                "headless": False,
-                "proxy": "http://proxy.brizodata.com:24182",
-                # "profile": None,
-                # "tiny_profile": False,
-                # "block_images": False,
-                # "block_images_and_css": False,
-                # "wait_for_complete_page_load": wait,
-                # "extensions": [],
-                "arguments": [
-                    "--ignore-certificate-errors",
-                    "--ignore-ssl-errors=yes"
-                ],
-                # "user_agent": None,
-                # "lang": "en",
-                # "beep": False
-            }
-            
-            self._driver = Driver(**driver_config)
-            
-            if not self._driver._tab:
-                raise DriverError("Impossible d'initialiser le driver")
+        if not self._driver._tab:
+            raise DriverError("Impossible d'initialiser le driver")
                 
-            await asyncio.sleep(2)
-            
-        except Exception as e:
-            raise DriverError(f"Erreur lors de l'initialisation du driver: {str(e)}")
+    @no_print
+    @error_decorator
+    def close(self) -> None:
+        if self._driver is not None:
+            self._driver.close()
+            self._driver = None
 
-    async def close(self) -> None:
-        try:
-            if self._driver is not None:
-                self._driver.close()
-                self._driver = None
-        except Exception as e:
-            raise DriverError(f"Couldn't close driver: {str(e)}")
-
-    async def get(self, url: str, bypass_cloudflare: bool = False,
+    @no_print
+    @error_decorator
+    def get(self, url: str, bypass_cloudflare: bool = False,
                  accept_cookies: bool = False, wait: Optional[int] = None) -> None:
-        driver = await self.driver
-        try:
-            if driver.config.is_new:
-                async def async_google_get(*args, **kwargs):
-                    return driver.google_get(*args, **kwargs)
-                
-                await async_google_get(
-                    link=url,
-                    bypass_cloudflare=bypass_cloudflare,
-                    accept_google_cookies=accept_cookies,
-                    wait=wait or self.config.min_delay
-                )
-            else:
-                response = driver.requests.get(url=url)
-                response.raise_for_status()
-                return response
-                
-        except Exception as e:
-            raise DriverError(f"Erreur lors du chargement de la page: {str(e)}")
-
-    async def find(self, selector: str, timeout: int = 10) -> Optional[Element]:
-        driver = await self.driver
-        try:
-            return driver.select(
-                selector=selector,
-                wait=min(timeout, self.config.max_delay)
+        if self.driver.config.is_new:
+            self.driver.google_get(
+                link=url,
+                bypass_cloudflare=bypass_cloudflare,
+                accept_google_cookies=accept_cookies,
+                wait=wait or self.config.min_delay
             )
-        except Exception as e:
-            raise DriverError(f"Erreur lors de la recherche d'éléments: {str(e)}")
+        else:
+            response = self.driver.requests.get(url=url)
+            response.raise_for_status()
+            return response
+
+    @no_print
+    @error_decorator
+    def find(self, selector: str, timeout: int = 10) -> Optional[Element]:
+        return self.driver.select(
+            selector=selector,
+            wait=min(timeout, self.config.max_delay)
+        )
