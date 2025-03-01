@@ -38,21 +38,21 @@ class Scraper:
     )
     def open(self, wait: bool = True) -> None:
         driver_config = {
-            "headless": False,
-            # "proxy": "",
-            # "profile": None,
-            # "tiny_profile": False,
-            # "block_images": False,
-            # "block_images_and_css": False,
+            "headless": self.config.headless if self.config.headless is not None else False,
+            "proxy": self.config.proxy if self.config.proxy is not None else "",
+            "profile": self.config.profile if self.config.profile is not None else None,
+            "tiny_profile": self.config.tiny_profile if self.config.tiny_profile is not None else False,
+            "block_images": self.config.block_images if self.config.block_images is not None else False,
+            "block_images_and_css": self.config.block_images_and_css if self.config.block_images_and_css is not None else False,
             "wait_for_complete_page_load": wait,
-            # "extensions": [],
-            "arguments": [
+            "extensions": self.config.extensions if self.config.extensions else [],
+            "arguments": self.config.arguments if self.config.arguments else [
                 "--ignore-certificate-errors",
                 "--ignore-ssl-errors=yes"
             ],
-            # "user_agent": None,
-            # "lang": "en",
-            # "beep": False
+            "user_agent": self.config.user_agent if self.config.user_agent else None,
+            "lang": self.config.lang if self.config.lang else "en",  # Par défaut, anglais
+            "beep": self.config.beep if self.config.beep is not None else False,
         }
         self._driver = Driver(**driver_config)
         
