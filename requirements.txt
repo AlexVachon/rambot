@@ -1,0 +1,6 @@
+# requirements.txt
+wheel
+botasaurus
+loguru
+pydantic-settings
+pydantic
