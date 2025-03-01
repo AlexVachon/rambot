@@ -10,7 +10,7 @@ from botasaurus.browser import Driver
 
 from botasaurus_driver.driver import Element
 
-from .models import Listing, Restaurant
+from .models import Listing, Restaurant, ScraperModeManager
 from .config import ScraperConfig, ErrorConfig
 from .exceptions import DriverError
 
@@ -24,6 +24,7 @@ from loguru import logger as default_logger
 
 logger = default_logger
 
+
 class Scraper:
     
     ERRORS_CONFIG: ErrorConfig = {
@@ -33,9 +34,16 @@ class Scraper:
     
     
     def __init__(self, config: ScraperConfig = None):
+        
+        ScraperModeManager.add_mode("restaurant_details")
+        ScraperModeManager.add_mode("restaurant_links")
+        
         self.config = config or ScraperConfig()
         self._driver: Optional[Driver] = None
         self.logger = logger
+        
+        for mode in ScraperModeManager.get_modes():
+            ScraperModeManager.validate_mode(mode)
 
 
     @property
@@ -48,6 +56,8 @@ class Scraper:
     @no_print
     @errors(**ERRORS_CONFIG)
     def open(self, wait: bool = True) -> None:
+        self.logger.debug("Opening browser ...")
+        
         driver_config = {
             "headless": self.config.headless if self.config.headless is not None else False,
             "proxy": self.config.proxy if self.config.proxy is not None else "",
@@ -68,12 +78,13 @@ class Scraper:
         self._driver = Driver(**driver_config)
         
         if not self._driver._tab:
-            raise DriverError("Impossible d'initialiser le driver")
-
+            raise DriverError("Can't initialize driver")
+        
     
     @no_print
     @errors(**ERRORS_CONFIG)
     def close(self) -> None:
+        self.logger.debug("Closing browser...")
         if self._driver is not None:
             self._driver.close()
             self._driver = None
@@ -90,10 +101,14 @@ class Scraper:
                 accept_google_cookies=accept_cookies,
                 wait=wait
             )
+            self.logger.debug("Page is loaded")
         else:
             response = self.driver.requests.get(url=url)
             response.raise_for_status()
-            return response
+            
+            self.logger.debug("Page is loaded")
+            
+            return response 
 
 
     @no_print
@@ -115,22 +130,40 @@ class Scraper:
     
     
     @errors(**ERRORS_CONFIG)
-    def save(self, links: List[str]) -> None:
-        listing_links: List[Listing] = [self.create_listing({"link": link}).model_dump() for link in links]
-        self.write(data=listing_links)
-        
-    
+    def save(self, links: List[str], mode: str = "") -> None:
+        try:
+            listing_links: List[Listing] = [self.create_listing({"link": link}).model_dump() for link in links]
+            
+            self.write(data=listing_links, mode=mode)
+            self.logger.debug(f"Saved {len(listing_links)} links")
+            
+        except Exception as e:
+            self.logger.error(f"Failed to save links: {e}")
+            raise
+
+
     @errors(**ERRORS_CONFIG)
-    def write(self, data: List[Listing], filename: str = None) -> None:
-        if filename is None:
-            filename = datetime.now().strftime("%Y-%m-%d_%H-%M-%S") + '.json'
-        
-        os.makedirs("output", exist_ok=True)
-        path = os.path.join('output', filename)
-        
-        with open(path, 'w') as file:
-            json.dump({"data": data}, file, indent=4)
-    
+    def write(self, data: List[Listing], mode: str = "") -> None:
+        try:
+
+            if mode:
+                ScraperModeManager.validate_mode(mode)
+
+            filename = f"{mode}.json"
+            
+            os.makedirs("output", exist_ok=True)
+            
+            path = os.path.join('output', filename)
+            
+            with open(path, 'w') as file:
+                json.dump({"data": data}, file, indent=4)
+            
+            self.logger.debug("Data saved")
+            
+        except Exception as e:
+            self.logger.warning(f"Failed to write data to {path}: {e}")
+            raise
+
     
     @errors(**ERRORS_CONFIG)
     def read(self, filename: str) -> Dict[str, List[Listing]]:
@@ -145,7 +178,9 @@ class Scraper:
     
     @errors(**ERRORS_CONFIG)
     def wait(self, min: float = 0.1, max: float = 1):
-        time.sleep(random.uniform(min, max))
+        delay = random.uniform(min, max)
+        self.logger.debug(f"waiting {delay:.2}s ...")
+        time.sleep(delay)
         
     
     @errors(**ERRORS_CONFIG)
@@ -157,15 +192,16 @@ class Scraper:
     def get_details(self, listing: Listing) -> Restaurant:
         raise NotImplementedError("You must implement get_details")
     
-    
-def scraper(mode: Union[Literal["restaurant_details", "restaurant_links"], str], input: str):
+
+def scraper(mode: str, input: str):
     def decorator(func):
         @wraps(func)
         def wrapper(self, *args, **kwargs):
+            ScraperModeManager.validate_mode(mode)
             try:
-                results = []
                 self.logger.debug(f"Running scraper mode \"{mode}\"")
-                
+
+                results = []
                 links = self.read(filename=input)
                 
                 self.open()
@@ -177,9 +213,10 @@ def scraper(mode: Union[Literal["restaurant_details", "restaurant_links"], str],
                     result = func(self, listing, *args, **kwargs)
                     if result:
                         results += result if isinstance(result, list) else [result]
-
                     
-                self.save(results)
+                    self.wait(1,2)
+                    
+                self.save(links=results, mode=mode)
             finally:
                 self.close()
         return wrapper
