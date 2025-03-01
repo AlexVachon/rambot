@@ -1,3 +1,2 @@
-from .scraper import Scraper
+from .scraper import Scraper, ScraperConfig
 from .decorators import *
-from botasaurus_driver.core.config import Config
