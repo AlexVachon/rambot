@@ -1,6 +1,8 @@
 #botminator/scraper.py
 import os
 import json
+import time 
+import random
 
 from botasaurus.browser import Driver
 
@@ -12,8 +14,9 @@ from .exceptions import DriverError
 
 from .decorators import no_print, errors
 
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Any
 from datetime import datetime
+
 
 from loguru import logger as default_logger
 
@@ -43,7 +46,6 @@ class Scraper:
     @no_print
     @errors(**ERRORS_CONFIG)
     def open(self, wait: bool = True) -> None:
-        print("HII")
         driver_config = {
             "headless": self.config.headless if self.config.headless is not None else False,
             "proxy": self.config.proxy if self.config.proxy is not None else "",
@@ -94,26 +96,45 @@ class Scraper:
 
     @no_print
     @errors(**ERRORS_CONFIG)
+    def find_all(self, selector: str, timeout: int = 10) -> Optional[List[Element]]:
+        return self.driver.select_all(
+            selector=selector,
+            wait=timeout
+        )
+    
+    
+    @no_print
+    @errors(**ERRORS_CONFIG)
     def find(self, selector: str, timeout: int = 10) -> Optional[Element]:
         return self.driver.select(
             selector=selector,
             wait=timeout
         )
-        
+    
         
     @errors(**ERRORS_CONFIG)
-    def write(self, content: List[Listing], filename: str = None) -> None:
+    def write(self, data: List[Listing], filename: str = None) -> None:
+        if filename is None:
+            filename = datetime.now().strftime("%Y-%m-%d_%H-%M-%S") + '.json'
+        
         os.makedirs("output", exist_ok=True)
         path = os.path.join('output', filename)
         
-        if filename is None:
-            filename = datetime.now().strftime("%Y-%m-%d_%H-%M-%S") + '.json'
-
         with open(path, 'w') as file:
-            json.dump({"data": content}, file, indent=4)
+            json.dump({"data": data}, file, indent=4)
     
     
     @errors(**ERRORS_CONFIG)
     def read(self, filename: str) -> Dict[str, List[Listing]]:
         with open(filename, 'r') as file:
             return json.load(file)
+    
+    
+    @errors(**ERRORS_CONFIG)
+    def create_listing(self, data: Dict[str, Any]) -> Listing:
+        return Listing(**data)
+    
+    
+    @errors(**ERRORS_CONFIG)
+    def wait(self, min: float = 0.1, max: float = 1):
+        time.sleep(random.uniform(min, max))
