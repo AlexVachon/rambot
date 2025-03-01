@@ -5,3 +5,7 @@ class Listing(BaseModel):
     
     def __str__(self):
         return f'{{"link": "{self.link}"}}'
+
+
+class Restaurant(BaseModel):
+    pass

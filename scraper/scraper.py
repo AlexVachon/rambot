@@ -8,7 +8,7 @@ from botasaurus.browser import Driver
 
 from botasaurus_driver.driver import Element
 
-from .models import Listing
+from .models import Listing, Restaurant
 from .config import ScraperConfig, ErrorConfig
 from .exceptions import DriverError
 
@@ -111,7 +111,13 @@ class Scraper:
             wait=timeout
         )
     
+    
+    @errors(**ERRORS_CONFIG)
+    def save(self, links: List[str]) -> None:
+        listing_links: List[Listing] = [self.create_listing({"link": link}).model_dump() for link in links]
+        self.write(data=listing_links)
         
+    
     @errors(**ERRORS_CONFIG)
     def write(self, data: List[Listing], filename: str = None) -> None:
         if filename is None:
@@ -138,3 +144,13 @@ class Scraper:
     @errors(**ERRORS_CONFIG)
     def wait(self, min: float = 0.1, max: float = 1):
         time.sleep(random.uniform(min, max))
+        
+    
+    @errors(**ERRORS_CONFIG)
+    def get_detail_links(self, listing: Listing) -> List[str]:
+        raise NotImplementedError("You must implement get_detail_links")
+    
+    
+    @errors(**ERRORS_CONFIG)
+    def get_details(self, listing: Listing) -> Restaurant:
+        raise NotImplementedError("You must implement get_details")
