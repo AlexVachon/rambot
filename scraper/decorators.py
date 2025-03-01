@@ -58,7 +58,7 @@ def errors(
                             format=format_str
                         )
                 
-                error_message = f"Erreur dans {func.__name__}: {str(e)}"
+                error_message = f"Error in {func.__name__}: {str(e)}"
                 traceback_details = traceback.format_exc()
                 
                 getattr(logger, log_level.lower())(

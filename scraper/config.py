@@ -1,4 +1,11 @@
-from typing import Type, List
+from typing import Type, List, Callable
+from typing_extensions import TypedDict
+
+
+class ErrorConfig(TypedDict, total=True):
+    must_raise: Callable[[Type[Exception]], bool]
+    create_logs: Callable[[Type[Exception]], bool]
+
 
 class ScraperConfig:
     def __init__(
