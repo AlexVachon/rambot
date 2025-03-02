@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field
-from typing import Literal
+from typing import Optional
+from enum import Enum
 
 class Listing(BaseModel):
     link: str = Field("", alias="link")
@@ -15,18 +16,25 @@ class ScraperModeManager:
     _modes = {}
 
     @classmethod
-    def add_mode(cls, name: str):
-        """Ajoute un nouveau mode si non existant."""
+    def register(cls, name: str):
         if name not in cls._modes:
             cls._modes[name] = name
 
     @classmethod
-    def get_modes(cls):
-        """Retourne tous les modes disponibles."""
+    def all(cls):
         return list(cls._modes.keys())
 
     @classmethod
-    def validate_mode(cls, mode: str):
-        """Vérifie si le mode existe, sinon lève une erreur."""
+    def validate(cls, mode: str):
         if mode not in cls._modes:
-            raise ValueError(f"Mode '{mode}' non reconnu. Modes disponibles: {cls.get_modes()}")
+            raise ValueError(f"Mode '{mode}' non reconnu. Modes disponibles: {cls.all()}")
+        
+
+class ModeStatus(Enum):
+    SUCCESS = "success"
+    ERROR = "error"
+
+
+class ModeResult(BaseModel):
+    status: ModeStatus = Field(ModeStatus.ERROR, alias="status")
+    message: Optional[str] = Field(None, alias="message")

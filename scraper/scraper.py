@@ -10,14 +10,13 @@ from botasaurus.browser import Driver
 
 from botasaurus_driver.driver import Element
 
-from .models import Listing, Restaurant, ScraperModeManager
+from .models import Listing, Restaurant, ScraperModeManager, ModeResult, ModeStatus
 from .config import ScraperConfig, ErrorConfig
 from .exceptions import DriverError
 
 from .decorators import no_print, errors
 
-from typing import Optional, List, Dict, Any, Union, Literal
-from datetime import datetime
+from typing import Optional, List, Dict, Any, Callable
 
 
 from loguru import logger as default_logger
@@ -26,6 +25,8 @@ logger = default_logger
 
 
 class Scraper:
+
+    mode_manager = ScraperModeManager()
     
     ERRORS_CONFIG: ErrorConfig = {
         "must_raise": lambda self: self.config.must_raise,
@@ -35,15 +36,15 @@ class Scraper:
     
     def __init__(self, config: ScraperConfig = None):
         
-        ScraperModeManager.add_mode("restaurant_details")
-        ScraperModeManager.add_mode("restaurant_links")
+        self.mode_manager.register("restaurant_details")
+        self.mode_manager.register("restaurant_links")
         
         self.config = config or ScraperConfig()
         self._driver: Optional[Driver] = None
         self.logger = logger
         
-        for mode in ScraperModeManager.get_modes():
-            ScraperModeManager.validate_mode(mode)
+        for mode in ScraperModeManager.all():
+            ScraperModeManager.validate(mode)
 
 
     @property
@@ -130,11 +131,11 @@ class Scraper:
     
     
     @errors(**ERRORS_CONFIG)
-    def save(self, links: List[str], mode: str = "") -> None:
+    def save(self, links: List[str]) -> None:
         try:
             listing_links: List[Listing] = [self.create_listing({"link": link}).model_dump() for link in links]
             
-            self.write(data=listing_links, mode=mode)
+            self.write(data=listing_links)
             self.logger.debug(f"Saved {len(listing_links)} links")
             
         except Exception as e:
@@ -143,25 +144,18 @@ class Scraper:
 
 
     @errors(**ERRORS_CONFIG)
-    def write(self, data: List[Listing], mode: str = "") -> None:
+    def write(self, data: List[Listing]) -> None:
         try:
+            if self.mode:
+                ScraperModeManager.validate(self.mode)
 
-            if mode:
-                ScraperModeManager.validate_mode(mode)
-
-            filename = f"{mode}.json"
+            filename = f"{self.mode}.json"
             
-            os.makedirs("output", exist_ok=True)
-            
-            path = os.path.join('output', filename)
-            
-            with open(path, 'w') as file:
+            with open(filename, 'w') as file:
                 json.dump({"data": data}, file, indent=4)
             
-            self.logger.debug("Data saved")
-            
         except Exception as e:
-            self.logger.warning(f"Failed to write data to {path}: {e}")
+            self.logger.warning(f"Failed to write data to {filename}: {e}")
             raise
 
     
@@ -179,7 +173,7 @@ class Scraper:
     @errors(**ERRORS_CONFIG)
     def wait(self, min: float = 0.1, max: float = 1):
         delay = random.uniform(min, max)
-        self.logger.debug(f"waiting {delay:.2}s ...")
+        self.logger.debug(f"waiting {delay}s ...")
         time.sleep(delay)
         
     
@@ -193,30 +187,39 @@ class Scraper:
         raise NotImplementedError("You must implement get_details")
     
 
-def scraper(mode: str, input: str):
-    def decorator(func):
+def scraper(mode: str, input: Optional[str] = None) -> Callable:
+    def decorator(func: Callable) -> Callable:
         @wraps(func)
-        def wrapper(self, *args, **kwargs):
-            ScraperModeManager.validate_mode(mode)
+        def wrapper(self, *args, **kwargs) -> "ModeResult":
+            self.mode_manager.validate(mode)
+            self.mode = self.mode_manager._modes[mode]
             try:
                 self.logger.debug(f"Running scraper mode \"{mode}\"")
+                self.open()
 
                 results = []
-                links = self.read(filename=input)
-                
-                self.open()
-                
-                for link in links:
-                    listing: Listing = self.create_listing(data=link)
-                    self.logger.debug(f"Scraping {listing}")
-                    
-                    result = func(self, listing, *args, **kwargs)
+
+                if input:
+                    data_list = self.read(filename=input)  
+                    for data in data_list:
+                        listing: Listing = self.create_listing(data=data)
+                        self.logger.debug(f"Scraping {listing}")
+
+                        result = func(self, listing, *args, **kwargs)
+                        if result:
+                            results += result if isinstance(result, list) else [result]
+
+                        self.wait(1, 2)
+                else:
+                    result = func(self, *args, **kwargs)
                     if result:
-                        results += result if isinstance(result, list) else [result]
-                    
-                    self.wait(1,2)
-                    
-                self.save(links=results, mode=mode)
+                            results += result if isinstance(result, list) else [result]
+
+                self.save(links=results)
+
+                return ModeResult(status=ModeStatus.SUCCESS)
+            except Exception as e:
+                return ModeResult(status=ModeStatus.ERROR, message=str(e))
             finally:
                 self.close()
         return wrapper
