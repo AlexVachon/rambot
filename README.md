@@ -182,6 +182,7 @@ In this example, the following modes are executed in sequence:
 2. **restaurant_links**: Once the city listings are gathered, this mode extracts links to individual restaurant listings.
 3. **restaurant_details**: Finally, this mode scrapes detailed information (like name and address) for each restaurant.
 
+Each mode is chained and relies on the output of the previous mode as its input, ensuring a seamless flow of data extraction.
 
 #### **Returning Custom Objects from Modes**
 
@@ -217,9 +218,3 @@ def restaurant_details(self, listing: Document) -> Restaurant:
 - By returning a custom object, you can easily extend the base functionality of Rambot to suit your needs, enabling more structured data handling and more specific attributes in your scraped data.
 
 This approach only works when the returned object inherits from `Document`, which ensures that it integrates smoothly with the rest of the framework’s features.
-
-This section explains how to customize the returned object in a mode by inheriting from `Document`, using the example of the `Restaurant` class. It shows the flexibility of `Rambot` when working with more specific data structures, making it adaptable to different scraping tasks.
-
-Each mode is chained and relies on the output of the previous mode as its input, ensuring a seamless flow of data extraction.
-
-This structure highlights the step-by-step scraping process, the modes involved, and how they are executed in sequence to gather all necessary data.
