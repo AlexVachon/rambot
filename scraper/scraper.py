@@ -50,7 +50,7 @@ class Scraper:
         self.mode_manager.validate(self.args.mode)
     
     
-    def run(self) -> None:
+    def run(self) -> List[Document]:
         if not hasattr(self, "args") or not hasattr(self.args, "mode"):
             raise RuntimeError("Calling .run() without calling .setup() first")
 
@@ -59,9 +59,7 @@ class Scraper:
 
         decorated_method = scrape(method)
 
-        decorated_method(self)
-
-        self.logger.debug("Done!")
+        return decorated_method(self)
 
 
     @property
@@ -238,7 +236,7 @@ def bind(
 
 def scrape(func: Callable) -> Callable:
     @wraps(func)
-    def wrapper(self, *args, **kwargs) -> ModeResult:
+    def wrapper(self, *args, **kwargs) -> List[Document]:
         if not isinstance(self, Scraper):
             raise TypeError(f"The @scrape decorator can only be used in a class inheriting from Scraper, not in {type(self).__name__}")
 
@@ -296,5 +294,7 @@ def scrape(func: Callable) -> Callable:
             
             self.save(links=results, mode_result=mode_result)
             self.close()
+            
+            return results
 
     return wrapper
