@@ -1,6 +1,8 @@
 ### **Description**  
 
-Rambot is a versatile and configurable web scraping framework designed to automate data extraction from web pages. It provides an intuitive structure for managing different scraping modes, handling browser automation, and logging.  
+Rambot is a versatile and configurable web scraping framework designed to automate data extraction from web pages. It provides an intuitive structure for managing different scraping modes, handling browser automation, and logging.
+
+This framework is ideal for web automation, data collection, and structured scraping tasks that require flexibility and reliability. 🚀
 
 ### **Installation**
 
@@ -180,8 +182,45 @@ In this example, the following modes are executed in sequence:
 2. **restaurant_links**: Once the city listings are gathered, this mode extracts links to individual restaurant listings.
 3. **restaurant_details**: Finally, this mode scrapes detailed information (like name and address) for each restaurant.
 
+Here’s how you can add the section explaining how the returned object from a mode can be changed, and how it works with a custom class that inherits from `Document`:
+
+#### **Returning Custom Objects from Modes**
+
+In `Rambot`, you can return custom objects from modes by creating classes that inherit from `Document`. This allows you to extend the data structure and store more specific information related to your scraping task.
+
+For example, in the following mode, we define a custom `Restaurant` class that inherits from `Document`. The mode `restaurant_details` returns an instance of `Restaurant` instead of the default `Document` class.
+
+```python
+class Restaurant(Document):
+    name: Optional[str] = None
+    address: Optional[str] = None
+    rating: Optional[float] = None
+
+@bind(mode="restaurant_details", input="restaurant_links.json", document_input=Document)
+def restaurant_details(self, listing: Document) -> Restaurant:
+    url = listing.link
+    
+    # Create an instance of the Restaurant class
+    restaurant = Restaurant(link=url)
+        
+    self.get(url)
+
+    # Process the details to populate the Restaurant object
+    self.process_details(restaurant=restaurant)
+    
+    # Return the Restaurant object
+    return restaurant
+```
+
+#### **How it Works**
+- The `Restaurant` class inherits from `Document`, allowing us to extend the basic document with additional fields like `name`, `address`, and `rating`.
+- The mode `restaurant_details` processes the details of a restaurant and returns an instance of the `Restaurant` class instead of a `Document`.
+- By returning a custom object, you can easily extend the base functionality of Rambot to suit your needs, enabling more structured data handling and more specific attributes in your scraped data.
+
+This approach only works when the returned object inherits from `Document`, which ensures that it integrates smoothly with the rest of the framework’s features.
+
+This section explains how to customize the returned object in a mode by inheriting from `Document`, using the example of the `Restaurant` class. It shows the flexibility of `Rambot` when working with more specific data structures, making it adaptable to different scraping tasks.
+
 Each mode is chained and relies on the output of the previous mode as its input, ensuring a seamless flow of data extraction.
 
 This structure highlights the step-by-step scraping process, the modes involved, and how they are executed in sequence to gather all necessary data.
-
-This framework is ideal for web automation, data collection, and structured scraping tasks that require flexibility and reliability. 🚀
