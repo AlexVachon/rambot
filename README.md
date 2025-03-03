@@ -61,7 +61,7 @@ To use this package, download ChromeDriver:
         ]
   ```
 
-2. **Initialize Scraper and run a scraping mode:**  
+2. **Initialize Scraper and run method:**  
   ```python
   if __name__ == "__main__":
     scraper = Scraper()
@@ -81,21 +81,12 @@ To use this package, download ChromeDriver:
         "justMyCode": false,
         "args": [
             "--mode", "cities"
+            // "--url" is not a required arg. It can be used to test your function using the provided link. 
+            // It should only be used in modes that require an input.
         ]
       }
     ]
   }
-  ```
-
-4. **Extract elements from a web page:**  
-  ```python
-  elements = self.find_all("div.article")
-  ```
-
-5. **Save data to a JSON file:**  
-  ```python
-  with open("scraped_data.json", "w") as file:
-      json.dump(data, file, indent=4)
   ```
 
 This framework is ideal for web automation, data collection, and structured scraping tasks that require flexibility and reliability. 🚀
