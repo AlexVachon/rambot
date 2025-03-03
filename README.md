@@ -89,9 +89,7 @@ To use this package, download ChromeDriver:
   }
   ```
 
-Here’s how the `Examples` section of the `README.md` could look with the code you provided:
 
-```markdown
 ### **Examples**
 
 The following example demonstrates how to use the `Rambot` framework to scrape data from SkipTheDishes, starting from city listings to restaurant details.
@@ -183,7 +181,6 @@ In this example, the following modes are executed in sequence:
 3. **restaurant_details**: Finally, this mode scrapes detailed information (like name and address) for each restaurant.
 
 Each mode is chained and relies on the output of the previous mode as its input, ensuring a seamless flow of data extraction.
-```
 
 This structure highlights the step-by-step scraping process, the modes involved, and how they are executed in sequence to gather all necessary data.
 
