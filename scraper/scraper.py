@@ -9,12 +9,12 @@ from functools import wraps
 from botasaurus.browser import Driver
 from botasaurus_driver.driver import Element
 
-from .models import Listing, Restaurant, ScraperModeManager, ModeResult, ModeStatus
+from .models import Listing, Document, ScraperModeManager, ModeResult, ModeStatus
 from .config import ScraperConfig, ErrorConfig
 from .exceptions import DriverError
 from .decorators import no_print, errors
 
-from typing import Optional, List, Dict, Any, Callable
+from typing import Optional, List, Dict, Any, Callable, Type
 
 from loguru import logger as default_logger
 
@@ -114,12 +114,14 @@ class Scraper:
     @errors(**ERRORS_CONFIG)
     def save(
         self,
-        links: List[str]
+        links: List[str],
+        document_output: Type[Document]
     ) -> None:
         try:
-            listing_links: List[Listing] = [self.create_listing({"link": link}).model_dump() for link in links if link]
-            self.write(data=listing_links)
-            self.logger.debug(f"Saved {len(listing_links)} links")
+            formatted_data = [document_output(link=link).output() for link in links]
+            
+            self.write(data=formatted_data)
+            self.logger.debug(f"Saved {len(formatted_data)} links")
         except Exception as e:
             self.logger.error(f"Failed to save links: {e}")
             raise
@@ -128,16 +130,13 @@ class Scraper:
     @errors(**ERRORS_CONFIG)
     def write(
         self,
-        data: List[Listing]
+        data: List[Type[Document]]
     ) -> None:
         try:
-            if self.mode:
-                ScraperModeManager.validate(self.mode)
-
             filename = f"{self.mode}.json"
             
             with open(filename, 'w') as file:
-                json.dump({"data": data}, file, indent=4)
+                json.dump(data, file, indent=4)
         
         except Exception as e:
             self.logger.warning(f"Failed to write data to {filename}: {e}")
@@ -154,12 +153,13 @@ class Scraper:
 
 
     @errors(**ERRORS_CONFIG)
-    def create_listing(
+    def create_document(
         self, 
-        data: Dict[str, Any]
-    ) -> Listing:
-        return Listing(**data)
-    
+        obj: Dict[str, Any], 
+        document: Type[Document]
+    ) -> Document:
+        return document(**obj)
+
     
     @no_print
     @errors(**ERRORS_CONFIG)
@@ -226,10 +226,12 @@ class Scraper:
 
 def bind(
     mode: str, 
-    input: Optional[str] = None
+    input: Optional[str] = None,
+    document_output: Type[Document] = Document,
+    document_input: Optional[Type[Document]] = None
 ) -> Callable:
     def decorator(func: Callable) -> Callable:
-        Scraper.mode_manager.register(mode, func, input)
+        Scraper.mode_manager.register(mode, func, input, document_output, document_input)
         return func
     return decorator
 
@@ -240,26 +242,31 @@ def scrape(func: Callable) -> Callable:
         if not isinstance(self, Scraper):
             raise TypeError(f"The @scrape decorator can only be used in a class inheriting from Scraper, not in {type(self).__name__}")
 
-        self.mode_manager.validate(self.args.mode)
-        self.mode = self.args.mode
+        self.mode_manager.validate(self.mode)
 
         try:
             self.logger.debug(f"Running scraper mode \"{self.mode}\"")
             self.open()
 
-            mode_info = self.mode_manager.get_mode_info(self.mode)
-            if mode_info['function'] is None:
+            mode_info = self.mode_manager.get_mode(self.mode)
+            if mode_info.func is None:
                 raise ValueError(f"No function associated with mode '{self.mode}'")
 
-            method = mode_info['function'].__get__(self, type(self))
+            method = mode_info.func.__get__(self, type(self))
+            document_output = mode_info.document_output
+            document_input = mode_info.document_input
 
             results = []
-            input_file = mode_info.get('input', None)
-            if input_file:
+            
+            if (input_file := mode_info.input):
                 input_list = self.read(filename=input_file)
 
-                for d in input_list.get('data'):
-                    listing: Listing = self.create_listing(data=d)
+                for d in input_list:
+                    if document_input:
+                        listing = self.create_document(obj=d, document=document_input)
+                    else:
+                        raise ValueError("Missing document_input parameter")
+                        
                     self.logger.debug(f"Processing {listing}")
 
                     result = method(listing, *args, **kwargs)
@@ -271,7 +278,7 @@ def scrape(func: Callable) -> Callable:
                 results = method(*args, **kwargs)
                 results = results if isinstance(results, list) else [results]
 
-            self.save(links=results)
+            self.save(links=results, document_output=document_output)
             return ModeResult(status=ModeStatus.SUCCESS)
 
         except Exception as e:
