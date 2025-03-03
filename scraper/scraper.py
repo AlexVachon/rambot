@@ -1,4 +1,4 @@
-import os
+import sys
 import json
 import time 
 import random
@@ -20,6 +20,12 @@ from loguru import logger as default_logger
 
 logger = default_logger
 
+logger.remove()
+logger.add(
+    sys.stdout,
+    format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> - <red>Scraper</red> - <level>{level}</level> - <yellow>{message}</yellow>",
+    colorize=True
+)
 
 class Scraper:
     mode_manager = ScraperModeManager()
