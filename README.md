@@ -89,4 +89,102 @@ To use this package, download ChromeDriver:
   }
   ```
 
+Here’s how the `Examples` section of the `README.md` could look with the code you provided:
+
+```markdown
+### **Examples**
+
+The following example demonstrates how to use the `Rambot` framework to scrape data from SkipTheDishes, starting from city listings to restaurant details.
+
+```python
+from rambot.scraper import Scraper, bind
+from rambot.scraper.models import Document
+
+from typing import List, Optional
+
+
+class Restaurant(Document):
+    name: Optional[str] = None
+    address: Optional[str] = None
+    rating: Optional[float] = None
+
+
+class App(Scraper):
+
+    BASE_URL: str = "https://www.skipthedishes.com"
+
+    @bind(mode="cities")
+    def cities(self) -> List[Document]:
+        self.get("https://www.skipthedishes.com/canada-food-delivery")
+        
+        elements = self.find_all("h4 div a")
+        
+        return [
+            Document(link=self.BASE_URL + href)
+            for element in elements 
+            if (href := element.get_attribute("href"))
+        ]
+
+
+    @bind(mode="restaurant_links", input="cities.json", document_input=Document)
+    def listing(self, listing: Document) -> List[Document]:
+        
+        url: str = listing.link
+        self.get(url)
+        
+        elements = self.find_all("a[data-testid='top-resto']")
+        
+        return [
+            Document(link=self.BASE_URL + href) 
+            for element in elements
+            if (href := element.get_attribute("href"))
+        ]
+
+
+    @bind(mode="restaurant_details", input="restaurant_links.json", document_input=Document)
+    def restaurant_details(self, listing: Document) -> Restaurant:
+        url = listing.link
+        
+        restaurant = Restaurant(link=url)
+            
+        self.get(url)
+
+        self.process_details(restaurant=restaurant)
+        
+        return restaurant
+
+
+    def process_details(self, restaurant: Restaurant) -> Restaurant:
+        restaurant.name = self.get_name()
+        restaurant.address = self.get_address()
+
+
+    def get_name(self) -> str:
+        return self.find("div[data-testid='partner-metadata-wrapper'] h1").text
+
+
+    def get_address(self) -> str:
+        elements = self.find_all("div[data-testid='partner-metadata-wrapper'] div span")
+        
+        address_elements = [element.text for element in elements if len(element.text.split()) > 1]
+        
+        return ', '.join(address_elements)
+
+
+if __name__ == "__main__":
+    app = App()
+    app.run()
+```
+
+#### **Modes Workflow**
+In this example, the following modes are executed in sequence:
+1. **cities**: This mode scrapes the city listings from the main page (`https://www.skipthedishes.com/canada-food-delivery`).
+2. **restaurant_links**: Once the city listings are gathered, this mode extracts links to individual restaurant listings.
+3. **restaurant_details**: Finally, this mode scrapes detailed information (like name and address) for each restaurant.
+
+Each mode is chained and relies on the output of the previous mode as its input, ensuring a seamless flow of data extraction.
+```
+
+This structure highlights the step-by-step scraping process, the modes involved, and how they are executed in sequence to gather all necessary data.
+
 This framework is ideal for web automation, data collection, and structured scraping tasks that require flexibility and reliability. 🚀
