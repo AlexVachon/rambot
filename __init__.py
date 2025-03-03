@@ -1,2 +1,2 @@
 from .scraper import *
-from .request import *
+from .requests import *
