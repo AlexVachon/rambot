@@ -180,7 +180,7 @@ Each mode is chained and relies on the output of the previous mode as its input,
 
 #### **Returning Custom Objects from Modes**
 
-In `Rambot`, you can return custom objects from modes by creating classes that inherit from `Document`. This allows you to extend the data structure and store more specific information related to your scraping task.
+`Rambot` allows you to custom the return objects from modes by creating classes that inherit from `Document`. This allows you to extend the data structure and store more specific information related to your scraping task.
 
 For example, in the following mode, we define a custom `Restaurant` class that inherits from `Document`. The mode `restaurant_details` returns an instance of `Restaurant` instead of the default `Document` class.
 
@@ -191,11 +191,11 @@ class Restaurant(Document):
     rating: Optional[float] = None
 
 @bind(mode="restaurant_details", input="restaurant_links.json", document_input=Document)
-def restaurant_details(self, listing: Document) -> Restaurant:
+def restaurant_details(self, listing: Document) -> `Restaurant`:
     url = listing.link
     
     # Create an instance of the Restaurant class
-    restaurant = Restaurant(link=url)
+    `restaurant = Restaurant(link=url)`
         
     self.get(url)
 
