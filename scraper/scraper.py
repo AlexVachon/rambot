@@ -9,7 +9,7 @@ from functools import wraps
 from botasaurus.browser import Driver
 from botasaurus_driver.driver import Element
 
-from .models import Listing, Document, ScraperModeManager, ModeResult, ModeStatus
+from .models import Document, ScraperModeManager, ModeResult, ModeStatus
 from .config import ScraperConfig, ErrorConfig
 from .exceptions import DriverError
 from .decorators import no_print, errors
@@ -147,7 +147,7 @@ class Scraper:
     def read(
         self, 
         filename: str
-    ) -> Dict[str, List[Listing]]:
+    ) -> Dict[str, List[Document]]:
         with open(filename, 'r') as file:
             return json.load(file)
 
@@ -263,13 +263,13 @@ def scrape(func: Callable) -> Callable:
 
                 for d in input_list:
                     if document_input:
-                        listing = self.create_document(obj=d, document=document_input)
+                        doc = self.create_document(obj=d, document=document_input)
                     else:
                         raise ValueError("Missing document_input parameter")
                         
-                    self.logger.debug(f"Processing {listing}")
+                    self.logger.debug(f"Processing {doc}")
 
-                    result = method(listing, *args, **kwargs)
+                    result = method(doc, *args, **kwargs)
 
                     if result:
                         results += result if isinstance(result, list) else [result]
