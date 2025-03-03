@@ -1,0 +1,100 @@
+import sys
+from .utils import parse_response
+
+from loguru import logger as default_logger
+
+from botasaurus.request import request as request_decorator, Request
+from requests.exceptions import RequestException
+
+from .exceptions import MethodError, RequestFailure, OptionsError
+from .models import ALLOWED_METHODS, RequestOptions, ResponseContent, normalize_headers
+from .decorators import no_print
+
+from pydantic import HttpUrl
+
+from typing import Optional
+import json
+
+
+logger = default_logger
+
+logger.remove()
+logger.add(
+    sys.stdout,
+    format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> - <red>Scraper</red> - <level>{level}</level> - <white>{message}</white>",
+    colorize=True
+)
+
+@no_print
+def send(
+    method: ALLOWED_METHODS,
+    url: HttpUrl,
+    options: RequestOptions = {}, 
+    max_retry: Optional[int] = 5, 
+    retry_wait: Optional[int] = 5, 
+    raw: bool = False
+) -> ResponseContent:
+    """
+    Sends an HTTP request using the specified method and options.
+
+    This function supports automatic retries and optional response parsing. 
+    It wraps the request execution with error handling and logging.
+
+    Args:
+        method (ALLOWED_METHODS): The HTTP method to use (e.g., "GET", "POST").
+        options (RequestOptions): The request options, including proxies, headers, and payload.
+        max_retry (OPTIONAL_INT, optional): Maximum number of retry attempts in case of failure. Defaults to 5.
+        retry_wait (OPTIONAL_INT, optional): Delay (in seconds) between retry attempts. Defaults to 5.
+        raw (bool, optional): If True, returns the raw HTTP response instead of parsing it. Defaults to False.
+
+    Returns:
+        ResponseContent: The parsed response if `raw` is False, otherwise the raw HTTP response.
+
+    Raises:
+        MethodError: If an unsupported HTTP method is used.
+        RequestFailure: If the request fails due to an unknown error or a request exception.
+    """
+    
+    logger.debug(f"Trying to load \"{url}\" ...")
+    
+    @request_decorator(
+        max_retry=max_retry,
+        retry_wait=retry_wait,
+        output=None,
+        create_error_logs=False,
+        output_formats=[ResponseContent],
+        raise_exception=True,
+        close_on_crash=True,
+        must_raise_exceptions=[MethodError, OptionsError]
+    )
+    def send_request(request: Request, data: RequestOptions):
+        try:
+            if "headers" not in options or options["headers"] is None:
+                data["headers"] = {}
+            if "json" in data:
+                data["json"] = json.dumps(data["json"], ensure_ascii=False)
+            
+            data["headers"] = normalize_headers(data.get("headers", {}))
+            
+            if method == "GET":
+                response = request.get(url, **data)
+            elif method == "POST":
+                response = request.post(url, **data)
+            else:
+                raise MethodError(method=method)
+
+            response.raise_for_status()
+
+            return response if raw else parse_response(response=response)
+
+        except MethodError as e:
+            raise e
+        except RequestException as e:
+            logger.warning(e)
+            raise RequestFailure(f"Something went wrong in request: {e}")
+        except TypeError as e:
+            raise OptionsError(f"Options got unexpected values: {e}")
+        except Exception as e:
+            raise RequestFailure(f"The request has failed for unknown reason: {e}")
+
+    return send_request(data=options)

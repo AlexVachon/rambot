@@ -23,7 +23,7 @@ logger = default_logger
 logger.remove()
 logger.add(
     sys.stdout,
-    format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> - <red>Scraper</red> - <level>{level}</level> - <yellow>{message}</yellow>",
+    format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> - <red>Scraper</red> - <level>{level}</level> - <white>{message}</white>",
     colorize=True
 )
 
