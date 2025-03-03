@@ -8,8 +8,6 @@ from datetime import datetime
 import traceback
 from pathlib import Path
 
-from .models import ModeResult, ModeStatus
-
 from loguru import logger
 
 @contextlib.contextmanager
@@ -69,8 +67,6 @@ def errors(
                 
                 if any(isinstance(e, exc_type) for exc_type in effective_must_raise):
                     raise e
-                
-                return ModeResult(status=ModeStatus.ERROR, message=error_message)
             
         return wrapper
     return decorator

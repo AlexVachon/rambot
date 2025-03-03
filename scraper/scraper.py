@@ -43,13 +43,13 @@ class Scraper:
     def setup(self) -> None:
         parser = argparse.ArgumentParser(description="Launch script with a specific mode")
         parser.add_argument("--mode", type=str, required=True, help="Scraper's mode to start")
+        parser.add_argument("--url", type=str, required=False, help="URL to scrape (optional)")
         
         self.args = parser.parse_args()
         
         self.mode_manager.validate(self.args.mode)
     
     
-    @errors(**ERRORS_CONFIG)
     def run(self) -> None:
         if not hasattr(self, "args") or not hasattr(self.args, "mode"):
             raise RuntimeError("Calling .run() without calling .setup() first")
@@ -114,13 +114,13 @@ class Scraper:
     @errors(**ERRORS_CONFIG)
     def save(
         self,
-        links: List[str],
-        document_output: Type[Document]
+        links: List[Document],
+        mode_result: ModeResult
     ) -> None:
         try:
-            formatted_data = [document_output(link=link).output() for link in links]
+            formatted_data = [link.output() for link in links]
             
-            self.write(data=formatted_data)
+            self.write(data=formatted_data, mode_result=mode_result)
             self.logger.debug(f"Saved {len(formatted_data)} links")
         except Exception as e:
             self.logger.error(f"Failed to save links: {e}")
@@ -130,13 +130,14 @@ class Scraper:
     @errors(**ERRORS_CONFIG)
     def write(
         self,
-        data: List[Type[Document]]
+        data: List[Type[Document]],
+        mode_result: ModeResult
     ) -> None:
         try:
             filename = f"{self.mode}.json"
             
             with open(filename, 'w') as file:
-                json.dump(data, file, indent=4)
+                json.dump({"data": data, "run_stats": {"status": mode_result.status.value, "message": mode_result.message}}, file, indent=4)
         
         except Exception as e:
             self.logger.warning(f"Failed to write data to {filename}: {e}")
@@ -227,11 +228,10 @@ class Scraper:
 def bind(
     mode: str, 
     input: Optional[str] = None,
-    document_output: Type[Document] = Document,
     document_input: Optional[Type[Document]] = None
 ) -> Callable:
     def decorator(func: Callable) -> Callable:
-        Scraper.mode_manager.register(mode, func, input, document_output, document_input)
+        Scraper.mode_manager.register(mode, func, input, document_input)
         return func
     return decorator
 
@@ -253,15 +253,14 @@ def scrape(func: Callable) -> Callable:
                 raise ValueError(f"No function associated with mode '{self.mode}'")
 
             method = mode_info.func.__get__(self, type(self))
-            document_output = mode_info.document_output
             document_input = mode_info.document_input
 
             results = []
             
             if (input_file := mode_info.input):
-                input_list = self.read(filename=input_file)
+                input_list = {"data": [document_input(link=url).output()]} if (url := self.args.url) else self.read(filename=input_file)
 
-                for d in input_list:
+                for d in input_list.get("data", []):
                     if document_input:
                         doc = self.create_document(obj=d, document=document_input)
                     else:
@@ -272,18 +271,30 @@ def scrape(func: Callable) -> Callable:
                     result = method(doc, *args, **kwargs)
 
                     if result:
-                        results += result if isinstance(result, list) else [result]
+                        result = result if isinstance(result, list) else [result]
+                        
+                        if not all(isinstance(r, Document) for r in result):
+                            raise TypeError(f"Expected List[Document], but got {type(result)}")
+
+                        results += result
                     self.wait(1, 2)
             else:
                 results = method(*args, **kwargs)
+                
                 results = results if isinstance(results, list) else [results]
 
-            self.save(links=results, document_output=document_output)
-            return ModeResult(status=ModeStatus.SUCCESS)
+                if not all(isinstance(r, Document) for r in results):
+                    raise TypeError(f"Expected List[Document], but got {type(results)} with elements {results}")
+            
+            mode_result = ModeResult(status=ModeStatus.SUCCESS.value)
 
         except Exception as e:
-            return ModeResult(status=ModeStatus.ERROR, message=str(e))
+            results = []
+            mode_result =  ModeResult(status=ModeStatus.ERROR.value, message=str(e))
         finally:
+            self.logger.debug(f"Run is {mode_result.status.value} {mode_result.message if mode_result.message else ''}")
+            
+            self.save(links=results, mode_result=mode_result)
             self.close()
 
     return wrapper

@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Type, Optional, Callable
+from typing import Type, Optional, Callable, Dict, Any
 from enum import Enum
 
 
@@ -7,19 +7,17 @@ class Details(BaseModel):
     pass
 
 
-class Document():
-    def __init__(self, link: str):
-        self.link = link
-    
-    def output(self):
-        return {"link": self.link}
+class Document(BaseModel):
+   link: str
+   
+   def output(self) -> Dict[str, Any]:
+       return self.model_dump()
 
 
 class Mode(BaseModel):
     func: Optional[Callable] = Field(None, alias="func")
     input: Optional[str] = Field(None, alias="input")
     document_input: Optional[Type[Document]] = Field(None, alias="document_input")
-    document_output: Type[Document] = Field(alias="document_output")
 
 
 class ScraperModeManager:
@@ -32,11 +30,10 @@ class ScraperModeManager:
         name: str, 
         func: Optional[Callable] = None, 
         input: Optional[str] = None, 
-        document_output: Optional[Type[Document]] = None, 
         document_input: Optional[Type[Document]]  = None
     ):
         if name not in cls._modes:
-            cls._modes[name] = Mode(func=func, input=input, document_input=document_input, document_output=document_output)
+            cls._modes[name] = Mode(func=func, input=input, document_input=document_input)
 
     @classmethod
     def all(cls):
