@@ -182,7 +182,6 @@ In this example, the following modes are executed in sequence:
 2. **restaurant_links**: Once the city listings are gathered, this mode extracts links to individual restaurant listings.
 3. **restaurant_details**: Finally, this mode scrapes detailed information (like name and address) for each restaurant.
 
-Here’s how you can add the section explaining how the returned object from a mode can be changed, and how it works with a custom class that inherits from `Document`:
 
 #### **Returning Custom Objects from Modes**
 
