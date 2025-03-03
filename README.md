@@ -1,18 +1,9 @@
 ### **Description**  
 
-Rambot is a versatile and configurable web scraping framework designed to automate data extraction from web pages. It provides an intuitive structure for managing different scraping modes, handling browser automation, and logging.  
+Rambot is a versatile and configurable web scraping framework designed to automate data extraction from web pages. It provides an intuitive structure for managing different scraping modes, handling browser automation, and logging. It also includes a powerful HTTP request handling function enhancing Rambot’s capabilities for web scraping and data retrieval from APIs
 
 This framework is ideal for web automation, data collection, and structured scraping tasks that require flexibility and reliability. 🚀  
 
-### **New Feature: HTTP Request Handling**  
-
-Rambot now includes a powerful HTTP request handling function, `send`, which enables robust and customizable API calls with:  
-- **Automatic retries**: Define `max_retry` and `retry_wait` to handle request failures gracefully.  
-- **Flexible request options**: Supports custom headers, proxies, and JSON payloads.  
-- **Error handling**: Detects and raises appropriate exceptions (`MethodError`, `RequestFailure`, `OptionsError`).  
-- **Raw or parsed response**: Choose between a raw HTTP response or a processed JSON structure.  
-
-This addition enhances Rambot’s capabilities for web scraping and data retrieval from APIs.
 
 ### **Installation**
 
@@ -55,58 +46,6 @@ To use this package, download ChromeDriver:
 #### **Usage:**
 1. **Create your scraper using `Scraper`:**
   ```python
-  from rambot.scraper import Scraper, bind
-  from rambot.scraper.models import Document
-
-  class MyScraper(Scraper):
-
-    @bind(mode="cities")
-    def cities(self) -> List[Document]:
-        self.get("https://www.skipthedishes.com/canada-food-delivery")
-        
-        elements = self.find_all("h4 div a")
-        
-        return [
-            Document(link=self.BASE_URL + href)
-            for element in elements
-            if (href := element.get_attribute("href"))
-        ]
-  ```
-
-2. **Initialize Scraper and run method:**  
-  ```python
-  if __name__ == "__main__":
-    scraper = Scraper()
-    scraper.run() # Executes the mode registered via @bind
-  ```
-
-3. **Launch your scraper using `.vscode/launch.json`:**  
-  ```json
-  {
-    "version": "0.2.0",
-    "configurations": [
-      {
-        "name": "cities",
-        "type": "python",
-        "request": "launch",
-        "program": "main.py",
-        "justMyCode": false,
-        "args": [
-            "--mode", "cities"
-            // "--url" is not a required arg. It can be used to test your function using the provided link. 
-            // It should only be used in modes that require an input.
-        ]
-      }
-    ]
-  }
-  ```
-
-
-### **Examples**
-
-The following example demonstrates how to use the `Rambot` framework to scrape data from SkipTheDishes, starting from city listings to restaurant details.
-
-```python
 from rambot.scraper import Scraper, bind
 from rambot.scraper.models import Document
 
@@ -179,12 +118,57 @@ class App(Scraper):
         address_elements = [element.text for element in elements if len(element.text.split()) > 1]
         
         return ', '.join(address_elements)
+  ```
 
+2. **Initialize Scraper and run method:**  
+  ```python
+  if __name__ == "__main__":
+    scraper = Scraper()
+    scraper.run() # Executes the mode registered via @bind
+  ```
 
-if __name__ == "__main__":
-    app = App()
-    app.run()
-```
+3. **Launch your scraper using `.vscode/launch.json`:**  
+  ```json
+  {
+    "version": "0.2.0",
+    "configurations": [
+      {
+        "name": "cities",
+        "type": "python",
+        "request": "launch",
+        "program": "main.py",
+        "justMyCode": false,
+        "args": [
+            "--mode", "cities"
+        ]
+      },
+      {
+        "name": "restaurant_links",
+        "type": "python",
+        "request": "launch",
+        "program": "main.py",
+        "justMyCode": false,
+        "args": [
+          "--mode", "restaurant_links"
+        ]
+      },
+      {
+        "name": "restaurant_details",
+        "type": "python",
+        "request": "launch",
+        "program": "main.py",
+        "justMyCode": false,
+        "args": [
+          "--mode", "restaurant_details",
+          "--url", "https://www.skipthedishes.com/starbucks-kerr-street"
+  
+          //NOTE: "--url" is not a required arg. It can be used to test your function using the provided link. 
+          // It should only be used in modes that require an input.
+        ]
+      }
+    ]
+}
+  ```
 
 #### **Modes Workflow**
 In this example, the following modes are executed in sequence:
