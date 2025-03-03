@@ -1,8 +1,18 @@
 ### **Description**  
 
-Rambot is a versatile and configurable web scraping framework designed to automate data extraction from web pages. It provides an intuitive structure for managing different scraping modes, handling browser automation, and logging.
+Rambot is a versatile and configurable web scraping framework designed to automate data extraction from web pages. It provides an intuitive structure for managing different scraping modes, handling browser automation, and logging.  
 
-This framework is ideal for web automation, data collection, and structured scraping tasks that require flexibility and reliability. 🚀
+This framework is ideal for web automation, data collection, and structured scraping tasks that require flexibility and reliability. 🚀  
+
+### **New Feature: HTTP Request Handling**  
+
+Rambot now includes a powerful HTTP request handling function, `send`, which enables robust and customizable API calls with:  
+- **Automatic retries**: Define `max_retry` and `retry_wait` to handle request failures gracefully.  
+- **Flexible request options**: Supports custom headers, proxies, and JSON payloads.  
+- **Error handling**: Detects and raises appropriate exceptions (`MethodError`, `RequestFailure`, `OptionsError`).  
+- **Raw or parsed response**: Choose between a raw HTTP response or a processed JSON structure.  
+
+This addition enhances Rambot’s capabilities for web scraping and data retrieval from APIs.
 
 ### **Installation**
 
