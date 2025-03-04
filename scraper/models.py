@@ -23,7 +23,7 @@ class Mode(BaseModel):
     input: Optional[str] = Field(None, alias="input")
     document_input: Optional[Type[Document]] = Field(None, alias="document_input")
     
-    path: Optional[str] = Field(None, alias="path")
+    path: str   = Field(".", alias="path")
     save_logs: bool = Field(False, alias="save_logs")
     logs_output: Optional[str] = Field(None, alias="logs_output")
     
@@ -54,7 +54,7 @@ class ScraperModeManager:
         document_input: Optional[Type[Document]]  = None,
         save_logs: bool = False,
         logs_output: Optional[str] = None,
-        path: Optional[str] = None
+        path: str = '.'
     ):
         if name not in cls._modes:
             cls._modes[name] = Mode(

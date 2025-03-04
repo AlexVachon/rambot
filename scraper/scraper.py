@@ -49,6 +49,9 @@ class Scraper:
         self.args = parser.parse_args()
         
         self.mode_manager.validate(self.args.mode)
+        self.mode = self.args.mode
+        
+        self.setup_logging(mode=self.mode_manager.get_mode(self.mode))
         
         
     def setup_logging(self, mode: Mode):
@@ -59,11 +62,8 @@ class Scraper:
         if not hasattr(self, "args") or not hasattr(self.args, "mode"):
             raise RuntimeError("Calling .run() without calling .setup() first")
 
-        self.mode = self.args.mode
         method = self.mode_manager.get_func(self.mode)
         
-        self.setup_logging(mode=self.mode_manager.get_mode(self.mode))
-
         decorated_method = scrape(method)
 
         return decorated_method(self)
@@ -236,7 +236,7 @@ def bind(
     document_input: Optional[Type[Document]] = None,
     save_logs: bool = False,
     logs_output: Optional[str] = None,
-    path: Optional[str] = None
+    path: str = "."
     
 ) -> Callable:
     def decorator(func: Callable) -> Callable:
