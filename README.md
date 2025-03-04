@@ -228,9 +228,8 @@ In some cases, you may want to prevent the browser from opening and instead use 
 
 ```python
 from rambot.requests import requests
-from rambot.scraper import Scraper
+from rambot.scraper import Scraper, bind
 from rambot.models import Document
-from rambot.decorators import bind
 
 class MyScraper(Scraper):
 
