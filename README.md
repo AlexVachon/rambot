@@ -231,7 +231,7 @@ from rambot.requests import requests
 from rambot.scraper import Scraper, bind
 from rambot.models import Document
 
-class MyScraper(Scraper):
+class App(Scraper):
 
     def open(self, wait=True):
         if self.mode in ["cities"]:
