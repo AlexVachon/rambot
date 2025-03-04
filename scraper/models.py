@@ -30,14 +30,16 @@ class Mode(BaseModel):
     @field_validator("logs_output", mode="before")
     @classmethod
     def set_default_logs(cls, v, values):
+        path = values.data.get("path", ".")
+        
         if v is None:
-            path = values.data.get("path", ".")
             
             mode = values.data.get('name')
             today = date.today().strftime("%Y-%m-%d")
             
             return f"{path}/{mode}_{today}.log"
-        return v
+        
+        return f"{path}/{v}"
 
 
 class ScraperModeManager:
