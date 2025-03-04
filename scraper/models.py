@@ -1,4 +1,6 @@
-from pydantic import BaseModel, Field
+from datetime import date
+
+from pydantic import BaseModel, Field, field_validator
 from typing import Type, Optional, Callable, Dict, Any
 from enum import Enum
 
@@ -15,14 +17,31 @@ class Document(BaseModel):
 
 
 class Mode(BaseModel):
+    name: str = Field(alias="name")
+    
     func: Optional[Callable] = Field(None, alias="func")
     input: Optional[str] = Field(None, alias="input")
     document_input: Optional[Type[Document]] = Field(None, alias="document_input")
+    
+    path: Optional[str] = Field(None, alias="path")
+    save_logs: bool = Field(False, alias="save_logs")
+    logs_output: Optional[str] = Field(None, alias="logs_output")
+    
+    @field_validator("logs_output", mode="before")
+    @classmethod
+    def set_default_logs(cls, v, values):
+        if v is None:
+            path = values.data.get("path", ".")
+            
+            mode = values.data.get('name')
+            today = date.today().strftime("%Y-%m-%d")
+            
+            return f"{path}/{mode}_{today}.log"
+        return v
 
 
 class ScraperModeManager:
     _modes = {}
-
 
     @classmethod
     def register(
@@ -30,10 +49,21 @@ class ScraperModeManager:
         name: str, 
         func: Optional[Callable] = None, 
         input: Optional[str] = None, 
-        document_input: Optional[Type[Document]]  = None
+        document_input: Optional[Type[Document]]  = None,
+        save_logs: bool = False,
+        logs_output: Optional[str] = None,
+        path: Optional[str] = None
     ):
         if name not in cls._modes:
-            cls._modes[name] = Mode(func=func, input=input, document_input=document_input)
+            cls._modes[name] = Mode(
+                name=name,
+                func=func, 
+                input=input, 
+                document_input=document_input, 
+                save_logs=save_logs,
+                logs_output=logs_output,
+                path=path
+            )
 
     @classmethod
     def all(cls):
@@ -58,6 +88,7 @@ class ScraperModeManager:
         if func is None:
             raise ValueError(f"Aucune fonction associée au mode '{mode}'")
         return func
+
 
 
 class ModeStatus(Enum):

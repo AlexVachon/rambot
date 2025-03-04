@@ -3,31 +3,25 @@ import json
 import time 
 import random
 import argparse
+from datetime import datetime
 
 from functools import wraps
 
 from botasaurus.browser import Driver
 from botasaurus_driver.driver import Element
 
-from .models import Document, ScraperModeManager, ModeResult, ModeStatus
+from ..logging_config import update_logger_config, get_logger
+
+from .models import Document, ScraperModeManager, ModeResult, ModeStatus, Mode
 from .config import ScraperConfig, ErrorConfig
 from .exceptions import DriverError
 from .decorators import no_print, errors
 
 from typing import Optional, List, Dict, Any, Callable, Type
 
-from loguru import logger as default_logger
-
-logger = default_logger
-
-logger.remove()
-logger.add(
-    sys.stdout,
-    format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> - <red>Scraper</red> - <level>{level}</level> - <white>{message}</white>",
-    colorize=True
-)
 
 class Scraper:
+    
     mode_manager = ScraperModeManager()
     
     ERRORS_CONFIG: ErrorConfig = {
@@ -35,13 +29,14 @@ class Scraper:
         "create_logs": lambda self: self.config.create_error_logs
     }
     
+    
     def __init__(
         self, 
         config: ScraperConfig = None
-    ):
+    ):        
         self.config = config or ScraperConfig()
         self._driver: Optional[Driver] = None
-        self.logger = logger
+        self.logger = get_logger(__name__)
         
         self.setup()
 
@@ -54,14 +49,20 @@ class Scraper:
         self.args = parser.parse_args()
         
         self.mode_manager.validate(self.args.mode)
-    
-    
+        
+        
+    def setup_logging(self, mode: Mode):
+        update_logger_config(log_to_file=True, file_path=mode.logs_output) if mode.save_logs else update_logger_config(log_to_file=False)
+        
+        
     def run(self) -> List[Document]:
         if not hasattr(self, "args") or not hasattr(self.args, "mode"):
             raise RuntimeError("Calling .run() without calling .setup() first")
 
         self.mode = self.args.mode
         method = self.mode_manager.get_func(self.mode)
+        
+        self.setup_logging(mode=self.mode_manager.get_mode(self.mode))
 
         decorated_method = scrape(method)
 
@@ -232,10 +233,22 @@ class Scraper:
 def bind(
     mode: str, 
     input: Optional[str] = None,
-    document_input: Optional[Type[Document]] = None
+    document_input: Optional[Type[Document]] = None,
+    save_logs: bool = False,
+    logs_output: Optional[str] = None,
+    path: Optional[str] = None
+    
 ) -> Callable:
     def decorator(func: Callable) -> Callable:
-        Scraper.mode_manager.register(mode, func, input, document_input)
+        Scraper.mode_manager.register(
+            mode, 
+            func, 
+            input, 
+            document_input,
+            save_logs,
+            logs_output,
+            path
+        )
         return func
     return decorator
 

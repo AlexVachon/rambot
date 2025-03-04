@@ -1,7 +1,7 @@
 import sys
 from .utils import parse_response
 
-from loguru import logger as default_logger
+from ..logging_config import get_logger
 
 from botasaurus.request import request as request_decorator, Request
 from requests.exceptions import RequestException
@@ -15,15 +15,8 @@ from pydantic import HttpUrl
 from typing import Optional
 import json
 
+logger = get_logger(__name__)
 
-logger = default_logger
-
-logger.remove()
-logger.add(
-    sys.stdout,
-    format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> - <red>Scraper</red> - <level>{level}</level> - <white>{message}</white>",
-    colorize=True
-)
 
 @no_print
 def send(
