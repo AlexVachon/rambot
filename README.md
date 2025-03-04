@@ -15,7 +15,9 @@ To use this package, download ChromeDriver:
   - `brew install chromedriver` (for macOS)
   - `sudo apt install chromium-chromedriver` (for Linux)
 
+
 #### **Key Features:**  
+
 - **Mode-based Execution:**  
   - Supports multiple scraping modes, validated through `ScraperModeManager`.  
   - Uses the `@bind` decorator to register functions for specific modes.  
@@ -43,7 +45,9 @@ To use this package, download ChromeDriver:
   - `@no_print` to suppress unwanted output.  
   - `@scrape` to enforce function structure in scraping processes.  
 
+
 #### **Usage:**
+
 1. **Create your scraper using `Scraper`:**
   ```python
 from rambot.scraper import Scraper, bind
@@ -120,12 +124,14 @@ class App(Scraper):
         return ', '.join(address_elements)
   ```
 
+
 2. **Initialize Scraper and run method:**  
   ```python
   if __name__ == "__main__":
     scraper = Scraper()
     scraper.run() # Executes the mode registered via @bind
   ```
+
 
 3. **Launch your scraper using `.vscode/launch.json`:**  
   ```json
@@ -191,11 +197,11 @@ class Restaurant(Document):
     rating: Optional[float] = None
 
 @bind(mode="restaurant_details", input="restaurant_links.json", document_input=Document)
-def restaurant_details(self, listing: Document) -> `Restaurant`:
+def restaurant_details(self, listing: Document) -> Restaurant:
     url = listing.link
     
     # Create an instance of the Restaurant class
-    `restaurant = Restaurant(link=url)`
+    restaurant = Restaurant(link=url)
         
     self.get(url)
 
@@ -212,3 +218,50 @@ def restaurant_details(self, listing: Document) -> `Restaurant`:
 - By returning a custom object, you can easily extend the base functionality of Rambot to suit your needs, enabling more structured data handling and more specific attributes in your scraped data.
 
 This approach only works when the returned object inherits from `Document`, which ensures that it integrates smoothly with the rest of the framework’s features.
+
+
+### **Using requests**  
+
+In some cases, you may want to prevent the browser from opening and instead use the `requests` module for making HTTP requests. Rambot allows you to specify modes where browser automation is disabled, and requests are used instead.  
+
+#### **Example: Fetching Cities Without Opening a Browser**  
+
+```python
+from rambot.requests import requests
+from rambot.scraper import Scraper
+from rambot.models import Document
+from rambot.decorators import bind
+
+class MyScraper(Scraper):
+
+    def open(self, wait=True):
+        if self.mode in ["cities"]:
+            return  # Prevent browser from opening for this mode
+        return super().open(wait)
+
+    @bind(mode="cities")
+    def cities(self) -> list[Document]:
+        response = requests.send(
+            method="GET",
+            url="https://www.skipthedishes.com/canada-food-delivery",
+            options={"timeout": 15},
+            max_retry=5,
+            retry_wait=1.25
+        )
+        elements = response.select("h4 div a")
+        
+        return [
+            Document(link=self.BASE_URL + href)
+            for element in elements
+            if (href := element.get("href"))
+        ]
+```
+
+#### **Key Features:**  
+- **Disabling Browser for Specific Modes**: The `open` method is overridden to prevent opening the browser for the `"cities"` mode.  
+- **Making HTTP Requests**: The `requests.send()` method is used to fetch data from a webpage.  
+- **Retry Mechanism**: Supports retrying failed requests with customizable `max_retry` and `retry_wait` parameters.  
+- **Extracting Links**: The response is parsed to extract relevant links.  
+
+This approach provides a more lightweight and efficient alternative when full browser automation is unnecessary. 🚀
+
