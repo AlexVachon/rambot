@@ -128,8 +128,8 @@ class App(Scraper):
 2. **Initialize Scraper and run method:**  
   ```python
   if __name__ == "__main__":
-    scraper = Scraper()
-    scraper.run() # Executes the mode registered via @bind
+    app = App()
+    app.run() # Executes the mode registered via launch.json file
   ```
 
 
