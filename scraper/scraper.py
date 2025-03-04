@@ -7,8 +7,9 @@ from datetime import datetime
 
 from functools import wraps
 
-from botasaurus.browser import Driver
-from botasaurus_driver.driver import Element
+
+from botasaurus_driver.driver import Element, Driver
+
 
 from ..logging_config import update_logger_config, get_logger
 
@@ -106,7 +107,7 @@ class Scraper:
         if not self._driver._tab:
             raise DriverError("Can't initialize driver")
     
-    
+        
     @no_print
     @errors(**ERRORS_CONFIG)
     def close(self) -> None:
@@ -229,6 +230,16 @@ class Scraper:
         self.logger.debug(f"Waiting {delay}s ...")
         time.sleep(delay)
     
+    
+    @errors(**ERRORS_CONFIG)
+    def get_requests(self):
+        return self._network_requests
+    
+    
+    @errors(**ERRORS_CONFIG)
+    def clear_requests(self):
+        self._network_requests.clear()
+        
 
 def bind(
     mode: str, 
