@@ -1,8 +1,8 @@
 ### **Description**  
 
-Rambot is a versatile and configurable web scraping framework designed to automate data extraction from web pages. It provides an intuitive structure for managing different scraping modes, handling browser automation, and logging. It also includes a powerful HTTP request handling function enhancing Rambot’s capabilities for web scraping and data retrieval from APIs
+Rambot is a versatile and configurable web scraping framework designed to automate data extraction from web pages. It provides an intuitive structure for managing different scraping modes, handling browser automation, and logging. It also includes a powerful HTTP request handling function enhancing Rambot’s capabilities for web scraping and data retrieval from APIs.
 
-This framework is ideal for web automation, data collection, and structured scraping tasks that require flexibility and reliability. 🚀  
+Rambot is ideal for web automation, data collection, and structured scraping tasks that require flexibility and reliability. 🚀  
 
 
 ### **Installation**
@@ -20,7 +20,7 @@ To use this package, download ChromeDriver:
 
 - **Mode-based Execution:**  
   - Supports multiple scraping modes, validated through `ScraperModeManager`.  
-  - Uses the `@bind` decorator to register functions for specific modes.  
+  - Uses the `@bind` decorator or `self.mode_manager.register()` to register functions for specific modes 
 
 - **Headless Browser Control:**  
   - Integrates with `botasaurus` for browser automation.  
@@ -48,7 +48,7 @@ To use this package, download ChromeDriver:
 
 #### **Usage:**
 
-1. **Create your scraper using `Scraper`:**
+1. **Create your scraper using the `Scraper` class:**
   ```python
 from rambot.scraper import Scraper, bind
 from rambot.scraper.models import Document
