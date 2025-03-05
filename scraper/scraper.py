@@ -1,4 +1,3 @@
-import sys
 import json
 import time 
 import random
@@ -13,11 +12,13 @@ from botasaurus_driver.driver import Element, Driver
 from ..logging_config import update_logger_config, get_logger
 
 from .models import Document, ScraperModeManager, ModeResult, ModeStatus, Mode
+
 from .config import ScraperConfig, ErrorConfig
+
 from .exceptions import DriverError
 from .decorators import no_print, errors
 
-from typing import Optional, List, Dict, Any, Callable, Type
+import typing
 
 
 class Scraper:
@@ -35,7 +36,8 @@ class Scraper:
         config: ScraperConfig = None
     ):        
         self.config = config or ScraperConfig()
-        self._driver: Optional[Driver] = None
+        self._driver: typing.Optional[Driver] = None
+        
         self.logger = get_logger(__name__)
         
         self.setup()
@@ -58,7 +60,7 @@ class Scraper:
         update_logger_config(log_to_file=True, file_path=mode.logs_output) if mode.save_logs else update_logger_config(log_to_file=False)
         
         
-    def run(self) -> List[Document]:
+    def run(self) -> typing.List[Document]:
         if not hasattr(self, "args") or not hasattr(self.args, "mode"):
             raise RuntimeError("Calling .run() without calling .setup() first")
 
@@ -70,7 +72,7 @@ class Scraper:
 
 
     @property
-    def driver(self) -> Optional[Driver]:
+    def driver(self) -> typing.Optional[Driver]:
         if not hasattr(self, '_driver') or not self._driver:
             self.open()
         return self._driver
@@ -105,13 +107,13 @@ class Scraper:
         
         if not self._driver._tab:
             raise DriverError("Can't initialize driver")
-    
+        
         
     @no_print
     @errors(**ERRORS_CONFIG)
     def close(self) -> None:
-        self.logger.debug("Closing browser...")
         if self._driver is not None:
+            self.logger.debug("Closing browser...")
             self._driver.close()
             self._driver = None
 
@@ -119,7 +121,7 @@ class Scraper:
     @errors(**ERRORS_CONFIG)
     def save(
         self,
-        links: List[Document],
+        links: typing.List[Document],
         mode_result: ModeResult
     ) -> None:
         try:
@@ -135,7 +137,7 @@ class Scraper:
     @errors(**ERRORS_CONFIG)
     def write(
         self,
-        data: List[Type[Document]],
+        data: typing.List[typing.Type[Document]],
         mode_result: ModeResult
     ) -> None:
         try:
@@ -153,7 +155,7 @@ class Scraper:
     def read(
         self, 
         filename: str
-    ) -> Dict[str, List[Document]]:
+    ) -> typing.Dict[str, typing.List[Document]]:
         with open(filename, 'r') as file:
             return json.load(file)
 
@@ -161,8 +163,8 @@ class Scraper:
     @errors(**ERRORS_CONFIG)
     def create_document(
         self, 
-        obj: Dict[str, Any], 
-        document: Type[Document]
+        obj: typing.Dict[str, typing.Any], 
+        document: typing.Type[Document]
     ) -> Document:
         return document(**obj)
 
@@ -174,7 +176,7 @@ class Scraper:
         url: str, 
         bypass_cloudflare: bool = False,
         accept_cookies: bool = False, 
-        wait: Optional[int] = None
+        wait: typing.Optional[int] = None
     ) -> None:
         if self.driver.config.is_new:
             self.driver.google_get(
@@ -199,7 +201,7 @@ class Scraper:
         self, 
         selector: str, 
         timeout: int = 10
-    ) -> List[Element]:
+    ) -> typing.List[Element]:
         return self.driver.select_all(
             selector=selector,
             wait=timeout
@@ -242,14 +244,14 @@ class Scraper:
 
 def bind(
     mode: str, 
-    input: Optional[str] = None,
-    document_input: Optional[Type[Document]] = None,
+    input: typing.Optional[str] = None,
+    document_input: typing.Optional[typing.Type[Document]] = None,
     save_logs: bool = False,
-    logs_output: Optional[str] = None,
+    logs_output: typing.Optional[str] = None,
     path: str = "."
     
-) -> Callable:
-    def decorator(func: Callable) -> Callable:
+) -> typing.Callable:
+    def decorator(func: typing.Callable) -> typing.Callable:
         Scraper.mode_manager.register(
             mode, 
             func, 
@@ -263,9 +265,9 @@ def bind(
     return decorator
 
 
-def scrape(func: Callable) -> Callable:
+def scrape(func: typing.Callable) -> typing.Callable:
     @wraps(func)
-    def wrapper(self, *args, **kwargs) -> List[Document]:
+    def wrapper(self, *args, **kwargs) -> typing.List[Document]:
         if not isinstance(self, Scraper):
             raise TypeError(f"The @scrape decorator can only be used in a class inheriting from Scraper, not in {type(self).__name__}")
 
