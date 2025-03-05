@@ -323,7 +323,7 @@ Scraper decorators
 """
 def bind(
     mode: str, 
-    input: typing.Optional[str] = None,
+    input: typing.Optional[typing.Union[str, typing.Callable[[], typing.List[typing.Dict[str, typing.Any]]]]] = None,
     document_input: typing.Optional[typing.Type[Document]] = None,
     save_logs: bool = False,
     logs_output: typing.Optional[str] = None,
@@ -366,13 +366,14 @@ def scrape(func: typing.Callable) -> typing.Callable:
             results = []
             
             if (input_file := mode_info.input):
-                input_list = {"data": [document_input(link=url).output()]} if (url := self.args.url) else self.read(filename=input_file)
+                if callable(input_file):
+                    input_list = {"data": input_file()}
+                else:
+                    input_list = {"data": [document_input(link=url).output()]} if (url := self.args.url) else self.read(filename=input_file)
 
                 for d in input_list.get("data", []):
                     if document_input:
                         doc = self.create_document(obj=d, document=document_input)
-                    else:
-                        raise ValueError("Missing document_input parameter")
                         
                     self.logger.debug(f"Processing {doc}")
 

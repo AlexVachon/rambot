@@ -1,31 +1,30 @@
+import typing
 from datetime import date
 
 from pydantic import BaseModel, Field, field_validator
-from typing import Type, Optional, Callable, Dict, Any
 from enum import Enum
 
 
-class Details(BaseModel):
-    pass
-
-
 class Document(BaseModel):
-   link: str
-   
-   def output(self) -> Dict[str, Any]:
-       return self.model_dump()
+    link: str
+
+    def output(self) -> typing.Dict[str, typing.Any]:
+        return self.model_dump()
+
+    def __str__(self):
+        return f"link: {self.link}"
 
 
 class Mode(BaseModel):
     name: str = Field(alias="name")
     
-    func: Optional[Callable] = Field(None, alias="func")
-    input: Optional[str] = Field(None, alias="input")
-    document_input: Optional[Type[Document]] = Field(None, alias="document_input")
+    func: typing.Optional[typing.Callable] = Field(None, alias="func")
+    input: typing.Optional[typing.Union[str, typing.Callable[[], typing.List[typing.Dict[str, typing.Any]]]]] = Field(None, alias="input")
+    document_input: typing.Optional[typing.Type[Document]] = Field(None, alias="document_input")
     
     path: str   = Field(".", alias="path")
     save_logs: bool = Field(False, alias="save_logs")
-    logs_output: Optional[str] = Field(None, alias="logs_output")
+    logs_output: typing.Optional[str] = Field(None, alias="logs_output")
     
     @field_validator("logs_output", mode="before")
     @classmethod
@@ -49,11 +48,11 @@ class ScraperModeManager:
     def register(
         cls, 
         name: str, 
-        func: Optional[Callable] = None, 
-        input: Optional[str] = None, 
-        document_input: Optional[Type[Document]]  = None,
+        func: typing.Optional[typing.Callable] = None, 
+        input: typing.Optional[typing.Union[str, typing.Callable[[], typing.List[typing.Dict[str, typing.Any]]]]] = None, 
+        document_input: typing.Optional[typing.Type[Document]]  = None,
         save_logs: bool = False,
-        logs_output: Optional[str] = None,
+        logs_output: typing.Optional[str] = None,
         path: str = '.'
     ):
         if name not in cls._modes:
@@ -83,7 +82,7 @@ class ScraperModeManager:
         return cls._modes[mode]
 
     @classmethod
-    def get_func(cls, mode: str) -> Optional[Callable]:
+    def get_func(cls, mode: str) -> typing.Optional[typing.Callable]:
         cls.validate(mode)
         mode_info = cls.get_mode(mode)
         func = mode_info.func
@@ -100,4 +99,4 @@ class ModeStatus(Enum):
 
 class ModeResult(BaseModel):
     status: ModeStatus = Field(ModeStatus.ERROR, alias="status")
-    message: Optional[str] = Field(None, alias="message")
+    message: typing.Optional[str] = Field(None, alias="message")
