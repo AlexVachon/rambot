@@ -5,9 +5,7 @@ import argparse
 
 from functools import wraps
 
-
 from botasaurus_driver.driver import Element, Driver, Wait
-
 
 from ..logging_config import update_logger_config, get_logger
 
@@ -168,7 +166,7 @@ class Scraper:
     ) -> Document:
         return document(**obj)
 
-    
+
     @no_print
     @errors(**ERRORS_CONFIG)
     def get(
@@ -367,7 +365,7 @@ def scrape(func: typing.Callable) -> typing.Callable:
             
             if (input_file := mode_info.input):
                 if callable(input_file):
-                    input_list = {"data": input_file()}
+                    input_list = {"data": input_file(self)}
                 else:
                     input_list = {"data": [document_input(link=url).output()]} if (url := self.args.url) else self.read(filename=input_file)
 

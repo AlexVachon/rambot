@@ -1,6 +1,7 @@
 # requirements.txt
 wheel
 botasaurus
+sqlalchemy
 loguru
 pydantic-settings
 pydantic
