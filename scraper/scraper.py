@@ -230,16 +230,7 @@ class Scraper:
         delay = random.uniform(min, max)
         self.logger.debug(f"Waiting {delay}s ...")
         time.sleep(delay)
-    
-    
-    @errors(**ERRORS_CONFIG)
-    def get_requests(self):
-        return self._network_requests
-    
-    
-    @errors(**ERRORS_CONFIG)
-    def clear_requests(self):
-        self._network_requests.clear()
+
         
 
 def bind(
