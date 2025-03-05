@@ -6,7 +6,7 @@ import argparse
 from functools import wraps
 
 
-from botasaurus_driver.driver import Element, Driver
+from botasaurus_driver.driver import Element, Driver, Wait
 
 
 from ..logging_config import update_logger_config, get_logger
@@ -193,10 +193,16 @@ class Scraper:
             self.logger.debug("Page is loaded")
             
             return response 
+    
+    
+    def get_current_url(self) -> str:
+        return self.driver.current_url
+    
+    
+    def refresh(self) -> None:
+        self.driver.reload()
         
         
-    @no_print
-    @errors(**ERRORS_CONFIG)
     def find_all(
         self, 
         selector: str, 
@@ -208,8 +214,6 @@ class Scraper:
         )
     
     
-    @no_print
-    @errors(**ERRORS_CONFIG)
     def find(
         self, 
         selector: str, 
@@ -221,7 +225,6 @@ class Scraper:
         )
     
     
-    @errors(**ERRORS_CONFIG)
     def wait(
         self, 
         min: float = 0.1, 
@@ -231,8 +234,93 @@ class Scraper:
         self.logger.debug(f"Waiting {delay}s ...")
         time.sleep(delay)
 
+    
+    def click(
+        self,
+        selector: str,
+        element: typing.Optional[Element] = None,
+        wait: typing.Optional[int] = Wait.SHORT
+    ):
+        element.click(selector, wait) if element else self.driver.click(selector, wait)
         
+    
+    def wait_element(
+        self, 
+        selector: str, 
+        wait: typing.Optional[int] = Wait.SHORT
+    ) -> bool:
+        return self.driver.is_element_present(selector, wait)
+    
+    
+    def get_cookies(self) -> typing.List[dict]:
+        return self.driver.get_cookies()
+    
+    
+    def add_cookies(
+        self, 
+        cookies: typing.List[dict]
+    ) -> None:
+        self.driver.add_cookies(cookies)
+    
+    
+    def delete_cookies(self) -> None:
+        self.driver.delete_cookies()
 
+
+    def get_local_storage(self) -> dict:
+        return self.driver.get_local_storage()
+
+
+    def add_local_storage(
+        self, 
+        local_storage: dict
+    ) -> None:
+        self.driver.add_local_storage(local_storage)
+
+
+    def delete_local_storage(self) -> None:
+        self.driver.delete_local_storage()
+        self.driver.element
+
+
+    def navigate_back(self):
+        pass
+
+
+    def navigate_forward(self):
+        pass
+    
+    
+    def scroll(
+        self,
+        selector: typing.Optional[str] = None,
+        by: int = 1000,
+        smooth_scroll: bool = True,
+        wait: typing.Optional[int] = Wait.SHORT
+    ) -> None:
+        self.driver.scroll(selector, by, smooth_scroll, wait)
+    
+    
+    def scroll_bottom(
+        self,
+        selector: typing.Optional[str] = None,
+        smooth_scrolling: bool = True,
+        wait: typing.Optional[int] = Wait.SHORT
+    ) -> None:
+        self.driver.scroll_to_bottom(selector, smooth_scrolling, wait)
+
+
+    def scroll_by(
+        self, 
+        selector: str, 
+        wait: typing.Optional[int] = Wait.SHORT
+    ) -> None:
+        self.driver.scroll_into_view(selector, wait)
+
+
+"""
+Scraper decorators
+"""
 def bind(
     mode: str, 
     input: typing.Optional[str] = None,
