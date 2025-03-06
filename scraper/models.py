@@ -41,12 +41,13 @@ class Mode(BaseModel):
     A model representing a mode of operation for a scraper or process.
 
     This class defines the configuration and parameters associated with a specific mode,
-    including the function to be executed, input parameters, logging configuration, and more.
+    including the function to be executed, input handling, logging options, and a save function.
 
     Attributes:
         name (str): The name of the mode.
         func (Optional[Callable]): An optional function to execute in this mode.
         input (Optional[Union[str, Callable]]): The input for the mode, which can be a string or a callable that returns a list of dictionaries.
+        save (Optional[Callable[[Any], None]]): An optional function to save the results of this mode.
         document_input (Optional[Type[Document]]): The document input type associated with the mode.
         path (str): The file path to store logs, defaults to the current directory.
         save_logs (bool): Whether to save logs for this mode.
@@ -56,6 +57,7 @@ class Mode(BaseModel):
     
     func: typing.Optional[typing.Callable] = Field(None, alias="func")
     input: typing.Optional[typing.Union[str, typing.Callable[[], typing.List[typing.Dict[str, typing.Any]]]]] = Field(None, alias="input")
+    save: typing.Optional[typing.Callable[[typing.Any], None]] = Field(None, alias="save")
     document_input: typing.Optional[typing.Type[Document]] = Field(None, alias="document_input")
     
     path: str   = Field(".", alias="path")
@@ -105,8 +107,9 @@ class ScraperModeManager:
         cls, 
         name: str, 
         func: typing.Optional[typing.Callable] = None, 
-        input: typing.Optional[typing.Union[str, typing.Callable[[], typing.List[typing.Dict[str, typing.Any]]]]] = None, 
-        document_input: typing.Optional[typing.Type[Document]]  = None,
+        input: typing.Optional[typing.Union[str, typing.Callable[[], typing.List[typing.Dict[str, typing.Any]]]]] = None,
+        save: typing.Optional[typing.Callable[[typing.Any], None]] = None,
+        document_input: typing.Optional[typing.Type[Document]] = None,
         save_logs: bool = False,
         logs_output: typing.Optional[str] = None,
         path: str = '.'
@@ -115,22 +118,25 @@ class ScraperModeManager:
         Registers a new mode for the scraper.
 
         This method allows you to register a new mode by providing a name, function, input parameters,
-        logging options, and other configurations.
+        a save function, logging options, and other configurations.
 
         Args:
             name (str): The name of the mode.
             func (Optional[Callable]): An optional function to associate with the mode.
-            input (Optional[Union[str, Callable]]): Input for the mode, can be a string or callable.
+            input (Optional[Union[str, Callable]]): The input for the mode, which can be a string or a callable.
+            save (Optional[Callable[[Any], None]]): A function to save the results of this mode.
             document_input (Optional[Type[Document]]): The document type associated with the mode.
             save_logs (bool): Whether to save logs for this mode.
-            logs_output (Optional[str]): The output path for the logs.
+            logs_output (Optional[str]): The output path for logs.
             path (str): The directory path for logs, defaults to the current directory.
         """
+
         if name not in cls._modes:
             cls._modes[name] = Mode(
                 name=name,
                 func=func, 
                 input=input, 
+                save=save,
                 document_input=document_input, 
                 save_logs=save_logs,
                 logs_output=logs_output,

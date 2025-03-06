@@ -322,17 +322,45 @@ Scraper decorators
 def bind(
     mode: str, 
     input: typing.Optional[typing.Union[str, typing.Callable[[], typing.List[typing.Dict[str, typing.Any]]]]] = None,
+    save: typing.Optional[typing.Callable[[typing.Any], None]] = None,
     document_input: typing.Optional[typing.Type[Document]] = None,
     save_logs: bool = False,
     logs_output: typing.Optional[str] = None,
     path: str = "."
-    
 ) -> typing.Callable:
+    """
+    A decorator to register a function as a mode in the ScraperModeManager.
+
+    This decorator allows binding a function to a specific mode with optional input processing, 
+    saving functionality, logging configuration, and document input type.
+
+    Args:
+        mode (str): The name of the mode to register.
+        input (Optional[Union[str, Callable]]): The input source for the mode, which can be:
+            - A string representing an input source.
+            - A callable that returns a list of dictionaries.
+        save (Optional[Callable[[Any], None]]): A function to save the results of the mode.
+        document_input (Optional[Type[Document]]): The document type associated with this mode.
+        save_logs (bool): Whether to enable logging for this mode.
+        logs_output (Optional[str]): The output path for logs. If None, a default path is used.
+        path (str): The directory path where logs should be stored. Defaults to the current directory.
+
+    Returns:
+        Callable: The original function, now registered as a mode.
+
+    Example:
+        ```python
+        @bind(mode="extract_data", save=my_save_function, save_logs=True)
+        def extract():
+            return {"data": "example"}
+        ```
+    """
     def decorator(func: typing.Callable) -> typing.Callable:
         Scraper.mode_manager.register(
             mode, 
             func, 
-            input, 
+            input,
+            save,
             document_input,
             save_logs,
             logs_output,
@@ -343,6 +371,40 @@ def bind(
 
 
 def scrape(func: typing.Callable) -> typing.Callable:
+    """
+    A decorator for handling the scraping process in a class inheriting from Scraper.
+
+    This decorator ensures that the function is executed within a properly managed scraping 
+    session, including validation, logging, input handling, and saving results.
+
+    Args:
+        func (Callable): The function to be decorated, expected to process and return a list of `Document` objects.
+
+    Returns:
+        Callable: A wrapped function that manages the scraping process.
+
+    Raises:
+        TypeError: If the decorator is used on a class that does not inherit from `Scraper`.
+        ValueError: If no function is associated with the current mode.
+        TypeError: If the function does not return a list of `Document` instances.
+
+    Functionality:
+        - Validates that the `Scraper` class is being used.
+        - Retrieves the mode's configuration from `ScraperModeManager`.
+        - Processes input data, either from a callable or a file.
+        - Calls the mode’s associated function, ensuring it returns a list of `Document` objects.
+        - Handles logging and exceptions.
+        - Saves the results using the mode's `save` function (if provided) and the scraper’s `save` method.
+
+    Example:
+        ```python
+        class MyScraper(Scraper):
+            @scrape
+            def my_scraper_function(self, document: Document):
+                # Process the document and return results
+                return document
+        ```
+    """
     @wraps(func)
     def wrapper(self, *args, **kwargs) -> typing.List[Document]:
         if not isinstance(self, Scraper):
@@ -360,6 +422,7 @@ def scrape(func: typing.Callable) -> typing.Callable:
 
             method = mode_info.func.__get__(self, type(self))
             document_input = mode_info.document_input
+            save = mode_info.save
 
             results = []
             
@@ -400,6 +463,8 @@ def scrape(func: typing.Callable) -> typing.Callable:
             mode_result =  ModeResult(status=ModeStatus.ERROR.value, message=str(e))
         finally:
             self.logger.debug(f"Run is {mode_result.status.value} {mode_result.message if mode_result.message else ''}")
+            
+            if save is not None: save(self, results, mode_result)
             
             self.save(links=results, mode_result=mode_result)
             self.close()
