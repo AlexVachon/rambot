@@ -417,8 +417,7 @@ def scrape(func: typing.Callable) -> typing.Callable:
             self.open()
 
             mode_info = self.mode_manager.get_mode(self.mode)
-            if mode_info.func is None:
-                raise ValueError(f"No function associated with mode '{self.mode}'")
+            if mode_info.func is None: raise ValueError(f"No function associated with mode '{self.mode}'")
 
             method = mode_info.func.__get__(self, type(self))
             document_input = mode_info.document_input
@@ -427,14 +426,12 @@ def scrape(func: typing.Callable) -> typing.Callable:
             results = []
             
             if (input_file := mode_info.input):
-                if callable(input_file):
-                    input_list = {"data": input_file(self)}
-                else:
-                    input_list = {"data": [document_input(link=url).to_dict()]} if (url := self.args.url) else self.read(filename=input_file)
+                if callable(input_file): input_list = {"data": input_file(self)}
+                else: input_list = {"data": [document_input(link=url).to_dict()]} if (url := self.args.url) else self.read(filename=input_file)
 
                 for d in input_list.get("data", []):
-                    if document_input:
-                        doc = self.create_document(obj=d, document=document_input)
+                    
+                    if document_input: doc = self.create_document(obj=d, document=document_input)
                         
                     self.logger.debug(f"Processing {doc}")
 
@@ -442,19 +439,15 @@ def scrape(func: typing.Callable) -> typing.Callable:
 
                     if result:
                         result = result if isinstance(result, list) else [result]
-                        
-                        if not all(isinstance(r, Document) for r in result):
-                            raise TypeError(f"Expected List[Document], but got {type(result)}")
+                        if not all(isinstance(r, Document) for r in result): raise TypeError(f"Expected List[Document], but got {type(result)}")
 
                         results += result
                     self.wait(1, 2)
             else:
                 results = method(*args, **kwargs)
-                
                 results = results if isinstance(results, list) else [results]
 
-                if not all(isinstance(r, Document) for r in results):
-                    raise TypeError(f"Expected List[Document], but got {type(results)} with elements {results}")
+                if not all(isinstance(r, Document) for r in results): raise TypeError(f"Expected List[Document], but got {type(results)} with elements {results}")
             
             mode_result = ModeResult(status=ModeStatus.SUCCESS.value)
 
