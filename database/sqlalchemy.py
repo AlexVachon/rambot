@@ -1,11 +1,8 @@
 from sqlalchemy import *
 from sqlalchemy.orm import sessionmaker
-
 from .models import BaseDocument
-
 from contextlib import contextmanager
 from loguru import logger
-
 
 class DatabaseConnection:
     """
@@ -34,6 +31,7 @@ class DatabaseConnection:
             pool_size (int): Number of connections in the connection pool (default: 5)
         """
         self.logger = logger
+        
         self.db_url = db_url
         self.echo = echo
         self.pool_size = pool_size
@@ -55,75 +53,45 @@ class DatabaseConnection:
         )
         self.metadata = MetaData()
         self._tables = {}
+        
+        self.logger.debug(f"Database connection established with URL: {self.db_url}")
     
     @contextmanager
-    def session_scope(self):
+    def session(self):
         """
-        Context manager for database session handling.
+        Context manager for handling database sessions.
         
         Ensures proper transaction management and session cleanup.
+        It automatically creates tables if they do not exist and provides
+        a session to interact with the database. The session is committed 
+        if no exceptions occur and rolled back if an exception is raised.
         
         Yields:
-            Session: SQLAlchemy session object
+            Session: SQLAlchemy session object to perform database operations.
             
         Raises:
-            Exception: Any exception occurring during session operations
+            Exception: Any exception occurring during session operations, 
+            which will cause the session to be rolled back.
         """
+        try:
+            BaseDocument.metadata.create_all(self.engine)
+            self.logger.debug("Tables initiated successfully.")
+        except Exception as e:
+            self.logger.error(f"Error while creating tables: {str(e)}")
+            raise
+        
+        self.logger.debug("Starting new database session.")
         session = self.Session()
+        
         try:
             yield session
+            
             session.commit()
+            self.logger.debug("Transaction committed successfully.")
         except Exception as e:
+            self.logger.error(f"Error during session operation: {str(e)}. Rolling back transaction.")
             session.rollback()
-            raise e
+            raise
         finally:
             session.close()
-    
-    def create_table(self, model_class) -> None:
-        """
-        Create a database table if it doesn't exist.
-        
-        Args:
-            model_class: SQLAlchemy model class containing __tablename__
-            
-        Raises:
-            ValueError: If model_class doesn't have __tablename__ attribute
-            Exception: If table creation fails
-            
-        Notes:
-            Uses atomic transactions for thread safety and maintains an internal
-            tracking of created tables to prevent duplicate creation attempts.
-        """
-        if not hasattr(model_class, "__tablename__"):
-            raise ValueError("Model must have __tablename__ attribute")
-        
-        table_name = model_class.__tablename__
-        if table_name in self._tables:
-            self.logger.debug(f"Table {table_name} already exists")
-            return
-        
-        try:
-            with self.engine.connect() as conn:
-                context = conn.begin()
-                try:
-                    # Check if table exists
-                    conn.execute(text(f"""
-                        SELECT name FROM sqlite_master 
-                        WHERE type='table' AND name=:table_name
-                    """), {"table_name": table_name})
-                    
-                    if not conn.execute(text("""
-                        SELECT name FROM sqlite_master 
-                        WHERE type='table' AND name=:table_name
-                    """), {"table_name": table_name}).fetchone():
-                        BaseDocument.metadata.create_all(conn, tables=[model_class.__table__])
-                        self._tables[table_name] = True
-                        self.logger.debug(f"Table {table_name} created successfully")
-                    context.commit()
-                except Exception as e:
-                    context.rollback()
-                    self.logger.error(f"Error creating table {table_name}: {str(e)}")
-                    raise
-        except Exception as e:
-            self.logger.error(f"Error connecting to database: {str(e)}")
-            raise
+            self.logger.debug("Session closed.")
