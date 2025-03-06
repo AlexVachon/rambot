@@ -35,17 +35,22 @@ def request(
 
     Args:
         method (ALLOWED_METHODS): The HTTP method to use (e.g., "GET", "POST").
-        options (RequestOptions): The request options, including proxies, headers, and payload.
-        max_retry (OPTIONAL_INT, optional): Maximum number of retry attempts in case of failure. Defaults to 5.
-        retry_wait (OPTIONAL_INT, optional): Delay (in seconds) between retry attempts. Defaults to 5.
-        raw (bool, optional): If True, returns the raw HTTP response instead of parsing it. Defaults to False.
+        url (HttpUrl): The target URL for the HTTP request.
+        options (RequestOptions, optional): The request options, such as headers, params, data, etc.
+            Defaults to an empty dictionary.
+        max_retry (Optional[int], optional): Maximum number of retry attempts in case of failure.
+            Defaults to 5.
+        retry_wait (Optional[int], optional): Delay (in seconds) between retry attempts. Defaults to 5.
+        raw (bool, optional): If `True`, returns the raw HTTP response instead of parsing it.
+            Defaults to `False`.
 
     Returns:
-        ResponseContent: The parsed response if `raw` is False, otherwise the raw HTTP response.
+        ResponseContent: The parsed response if `raw` is `False`, otherwise the raw HTTP response.
 
     Raises:
         MethodError: If an unsupported HTTP method is used.
         RequestFailure: If the request fails due to an unknown error or a request exception.
+        OptionsError: If there is an issue with the provided options.
     """
     
     logger.debug(f"Trying to load \"{url}\" ...")
@@ -61,9 +66,28 @@ def request(
         must_raise_exceptions=[MethodError, OptionsError]
     )
     def send_request(request: Request, data: RequestOptions):
+        """
+        Sends the actual HTTP request using the specified method and options.
+
+        This inner function is responsible for making the request using the method (GET or POST),
+        handling errors, and parsing the response.
+
+        Args:
+            request (Request): The decorated request object to send the HTTP request.
+            data (RequestOptions): The options dictionary containing request parameters, headers, etc.
+
+        Returns:
+            ResponseContent: The response from the server, either parsed or raw based on the `raw` flag.
+
+        Raises:
+            MethodError: If an unsupported HTTP method is used.
+            RequestFailure: If the request fails due to an error or exception.
+            OptionsError: If there are issues with the provided options.
+        """
         try:
             if "headers" not in options or options["headers"] is None:
                 data["headers"] = {}
+            
             if "json" in data:
                 data["json"] = json.dumps(data["json"], ensure_ascii=False)
             
