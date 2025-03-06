@@ -123,7 +123,7 @@ class Scraper:
         mode_result: ModeResult
     ) -> None:
         try:
-            formatted_data = [link.output() for link in links]
+            formatted_data = [link.to_dict() for link in links]
             
             self.write(data=formatted_data, mode_result=mode_result)
             self.logger.debug(f"Saved {len(formatted_data)} links")
@@ -367,7 +367,7 @@ def scrape(func: typing.Callable) -> typing.Callable:
                 if callable(input_file):
                     input_list = {"data": input_file(self)}
                 else:
-                    input_list = {"data": [document_input(link=url).output()]} if (url := self.args.url) else self.read(filename=input_file)
+                    input_list = {"data": [document_input(link=url).to_dict()]} if (url := self.args.url) else self.read(filename=input_file)
 
                 for d in input_list.get("data", []):
                     if document_input:
