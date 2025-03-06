@@ -19,7 +19,7 @@ logger = get_logger(__name__)
 
 
 @no_print
-def send(
+def request(
     method: ALLOWED_METHODS,
     url: HttpUrl,
     options: RequestOptions = {}, 
