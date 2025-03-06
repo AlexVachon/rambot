@@ -1,6 +1,1 @@
-from sqlalchemy import (
-    Column,
-    Integer,
-    String,
-    text
-)
+from sqlalchemy import *
