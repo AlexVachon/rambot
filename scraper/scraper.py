@@ -417,51 +417,63 @@ def scrape(func: typing.Callable) -> typing.Callable:
             self.open()
 
             mode_info = self.mode_manager.get_mode(self.mode)
-            if mode_info.func is None: raise ValueError(f"No function associated with mode '{self.mode}'")
+            if mode_info.func is None:
+                raise ValueError(f"No function associated with mode '{self.mode}'")
 
             method = mode_info.func.__get__(self, type(self))
             document_input = mode_info.document_input
             save = mode_info.save
 
-            results = []
-            
+            results = set()
+
             if (input_file := mode_info.input):
-                if callable(input_file): input_list = {"data": input_file(self)}
-                else: input_list = {"data": [document_input(link=url).to_dict()]} if (url := self.args.url) else self.read(filename=input_file)
+                if callable(input_file):
+                    input_list = {"data": input_file(self)}
+                else:
+                    input_list = {"data": [document_input(link=url).to_dict()]} if (url := self.args.url) else self.read(filename=input_file)
 
                 for d in input_list.get("data", []):
-                    
-                    if document_input: doc = self.create_document(obj=d, document=document_input)
-                        
+                    if document_input:
+                        doc = self.create_document(obj=d, document=document_input)
+
                     self.logger.debug(f"Processing {doc}")
 
                     result = method(doc, *args, **kwargs)
 
                     if result:
-                        result = result if isinstance(result, list) else [result]
-                        if not all(isinstance(r, Document) for r in result): raise TypeError(f"Expected List[Document], but got {type(result)}")
+                        if not isinstance(result, list): result = [result]
+                        if not all(isinstance(r, Document) for r in result):
+                            raise TypeError(f"Expected List[Document], but got {type(result)} with elements {result}")
 
-                        results += result
+                        results.update(result)
+
                     self.wait(1, 2)
             else:
-                results = method(*args, **kwargs)
-                results = results if isinstance(results, list) else [results]
+                result = method(*args, **kwargs)
+                if not isinstance(result, (list, set)):
+                    result = {result}
+                else:
+                    result = set(result)
 
-                if not all(isinstance(r, Document) for r in results): raise TypeError(f"Expected List[Document], but got {type(results)} with elements {results}")
-            
+                if not all(isinstance(r, Document) for r in result):
+                    raise TypeError(f"Expected List[Document], but got {type(result)} with elements {result}")
+
+                results.update(result)
+
             mode_result = ModeResult(status=ModeStatus.SUCCESS.value)
 
         except Exception as e:
-            results = []
-            mode_result =  ModeResult(status=ModeStatus.ERROR.value, message=str(e))
+            results = set()
+            mode_result = ModeResult(status=ModeStatus.ERROR.value, message=str(e))
         finally:
             self.logger.debug(f"Run is {mode_result.status.value} {mode_result.message if mode_result.message else ''}")
-            
-            if save is not None: save(self, results, mode_result)
-            
-            self.save(links=results, mode_result=mode_result)
+
+            if save is not None:
+                save(self, list(results), mode_result)
+
+            self.save(links=list(results), mode_result=mode_result)
             self.close()
-            
-            return results
+
+            return list(results)
 
     return wrapper
