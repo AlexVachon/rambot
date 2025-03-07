@@ -1,5 +1,7 @@
 import json
 import typing
+from datetime import datetime
+
 from sqlalchemy import *
 from sqlalchemy.ext.declarative import declarative_base
 Base = declarative_base()
@@ -63,6 +65,7 @@ class BaseMixin:
         """
         raise NotImplementedError(f"The _to_dict method must be implemented in {self.__class__.__name__}")
 
+
 class BaseDocument(BaseMixin, Base):
     """
     Abstract base document class combining SQLAlchemy declarative base with BaseMixin.
@@ -80,5 +83,5 @@ class BaseDocument(BaseMixin, Base):
         
         Sets created_at to current time using database server's clock.
         """
-        self.created_at = func.now()
+        self.created_at = datetime.now()
         super().__init__()
