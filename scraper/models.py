@@ -7,33 +7,82 @@ from enum import Enum
 
 class Document(BaseModel):
     """
-    A model representing a document with a link.
+    A model representing a document with a unique link.
 
-    This class is used to represent a document with a link. It includes a method
-    to convert the document to a dictionary and a string representation of the document.
+    This class is designed to represent a document with a link. It provides methods
+    to convert the document to a dictionary, compare documents, and enable usage in
+    hash-based collections such as sets and dictionaries.
 
     Attributes:
-        link (str): The link to the document.
+        link (str): The unique link associated with the document.
+
+    Methods:
+        to_dict() -> dict:
+            Converts the document instance into a dictionary representation.
+        
+        __str__() -> str:
+            Returns a human-readable string representation of the document.
+        
+        __eq__(other: object) -> bool:
+            Determines if two Document instances are equal based on their link.
+        
+        __hash__() -> int:
+            Computes a hash value for the document based on its link, making it hashable.
     """
+
     link: str
 
     def to_dict(self) -> typing.Dict[str, typing.Any]:
         """
-        Converts the document to a dictionary.
+        Converts the document to a dictionary representation.
+
+        This method serializes the `Document` instance into a dictionary format,
+        allowing easy conversion to JSON or storage in structured data formats.
 
         Returns:
-            dict: A dictionary representation of the document.
+            dict: A dictionary representation of the document, containing its attributes.
         """
         return self.model_dump()
 
-    def __str__(self):
+    def __str__(self) -> str:
         """
         Returns a string representation of the document.
 
+        This method provides a readable representation of the document,
+        primarily displaying its link.
+
         Returns:
-            str: The string representation of the document with its link.
+            str: A formatted string containing the document's link.
         """
         return f"link: {self.link}"
+
+    def __eq__(self, other: object) -> bool:
+        """
+        Checks equality between two Document instances.
+
+        Two Document instances are considered equal if they have the same link.
+
+        Args:
+            other (object): The object to compare with the current instance.
+
+        Returns:
+            bool: True if both instances have the same link, False otherwise.
+        """
+        if isinstance(other, Document):
+            return self.link == other.link
+        return False
+    
+    def __hash__(self) -> int:
+        """
+        Generates a hash value for the document.
+
+        This method allows Document instances to be used in sets and as dictionary keys
+        by computing a hash based on the `link` attribute.
+
+        Returns:
+            int: The computed hash value of the document.
+        """
+        return hash(self.link)
 
 
 class Mode(BaseModel):
