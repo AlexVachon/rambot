@@ -1,144 +1,169 @@
-# **Description**  
-
-Rambot is a versatile and configurable web scraping framework designed to automate data extraction from web pages. 
-
-It provides an intuitive structure for managing different scraping modes, handling browser automation, and logging. It also includes a powerful HTTP request handling function enhancing Rambot’s capabilities for web scraping and data retrieval from APIs.  
+# **Rambot: Versatile Web Scraping Framework**  
 
 
 
-# **Installation**
-
-`pip install rambot`
-
-To use this package, download ChromeDriver:
-- **Windows:** Download ChromeDriver from [here](https://sites.google.com/chromium.org/driver/downloads) and add it to PATH.
-- **macOS/Linux:** Install using:
-  - `brew install chromedriver` (for macOS)
-  - `sudo apt install chromium-chromedriver` (for Linux)
+## **Description**    
+Rambot is a versatile and configurable web scraping framework designed to automate data extraction from web pages. It provides an intuitive structure for:  
+- Managing different scraping modes.  
+- Automating browser navigation.  
+- Handling logs and errors.  
+- Performing advanced HTTP requests to interact with APIs.  
 
 
-## **Key Features:**  
 
-- **Mode-based Execution:**  
-  - Supports multiple scraping modes, validated through `ScraperModeManager`.  
-  - Uses the `@bind` decorator or `self.mode_manager.register()` to register functions for specific modes 
+## **Installation**    
+```bash
+pip install rambot
+```
 
-- **Headless Browser Control:**  
-  - Integrates with `botasaurus` for browser automation.  
-  - Provides options for handling proxies, blocking images, and loading extensions.  
-  - Uses `ChromeDriver` to navigate and extract content from websites.  
-
-- **Efficient Data Handling:**  
-  - Saves scraped data in JSON format.  
-  - Reads and processes existing data files for input.  
-  - Supports structured data representation using the `Document` model.  
-
-- **Error Management & Logging:**  
-  - Implements a centralized error-handling system with `ErrorConfig`.  
-  - Uses `loguru` for structured logging and debugging.  
-
-- **Built-in Throttling & Delays:**  
-  - Introduces randomized delays to mimic human behavior (`wait()` method).  
-  - Ensures compliance with website rate limits.  
-
-- **Decorators for Enhanced Functionality:**  
-  - `@errors` for structured error handling.  
-  - `@no_print` to suppress unwanted output.  
-  - `@scrape` to enforce function structure in scraping processes.  
+### **ChromeDriver Dependency**  
+Rambot uses `ChromeDriver` for automated browsing. Install it based on your operating system:  
+- **Windows**: [Download ChromeDriver here](https://sites.google.com/chromium.org/driver/downloads) and add it to your `PATH`.
+- **macOS**: Install via Homebrew:  
+  ```bash
+  brew install chromedriver
+  ```
+- **Linux**: Install via APT:  
+  ```bash
+  sudo apt install chromium-chromedriver
+  ```
 
 
-# **Basic Usage:**
 
-1. **Create your scraper using the `Scraper` class:**
-  ```python
+## **Key Features**    
+### **1. Mode-Based Execution**  
+- Supports multiple scraping modes via `ScraperModeManager`.
+- Use `@bind` decorator or `self.mode_manager.register()` to associate functions with specific modes.
+
+### **2. Headless Browser Control**  
+- Integrates with `botasaurus` for automation.
+- Advanced proxy management, image blocking, and extension loading.
+- Uses `ChromeDriver` to navigate and extract content.
+
+### **3. Optimized Data Handling**  
+- Saves extracted data in JSON format.
+- Reads and processes existing data files as input.
+- Models structured data using `Document`.
+
+### **4. Error Management & Logging**  
+- Centralized error handling with `ErrorConfig`.
+- Uses `loguru` for detailed and structured logging.
+
+### **5. Scraping Throttling & Delays**  
+- Introduces randomized delays to mimic human behavior (`wait()`).
+- Ensures compliance with website rate limits.
+
+### **6. Useful Decorators**  
+- `@errors`: Structured error handling.
+- `@no_print`: Suppresses unwanted output.
+- `@scrape`: Enforces function structure in scraping processes.
+
+
+
+## **Basic Usage**    
+
+### **1. Create a Scraper**  
+```python
 from rambot.scraper import Scraper, bind
 from rambot.scraper.models import Document
-
 import typing
 
 class App(Scraper):
-
     BASE_URL: str = "https://www.skipthedishes.com"
 
     @bind(mode="cities")
     def available_cities(self) -> typing.List[Document]:
         self.get("https://www.skipthedishes.com/canada-food-delivery")
-        
         elements = self.find_all("h4 div a")
-        
         return [
             Document(link=self.BASE_URL + href)
-            for element in elements 
+            for element in elements
             if (href := element.get_attribute("href"))
         ]
-  ```
+```
 
-
-2. **Initialize Scraper and run method:**  
-  ```python
-  if __name__ == "__main__":
+### **2. Run the Scraper**  
+```python
+if __name__ == "__main__":
     app = App()
-    app.run() # Executes the mode registered via launch.json file
-  ```
+    app.run()  # Executes the mode registered in launch.json
+```
 
-
-3. **Launch your scraper using `.vscode/launch.json`:**  
-  ```json
-  {
-    "version": "0.2.0",
-    "configurations": [
-      {
-        "name": "cities",
-        "type": "python",
-        "request": "launch",
-        "program": "main.py",
-        "justMyCode": false,
-        "args": [
-            "--mode", "cities"
-        ]
-      }
-    ]
-  }
-  ```
-4. **Find results in `{mode}.json` file"**
- ```json
- {
-    "data": [
-        {
-            "link": "https://www.skipthedishes.com/cities/calgary"
-        },
-        {
-            "link": "https://www.skipthedishes.com/cities/brandon"
-        },
-        {
-            "link": "https://www.skipthedishes.com/cities/welland"
-        }
-    ],
-    "run_stats": {
-        "status": "success",
-        "message": null
+### **3. Configure `launch.json` in VSCode**  
+```json
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "cities",
+      "type": "python",
+      "request": "launch",
+      "program": "main.py",
+      "justMyCode": false,
+      "args": ["--mode", "cities"]
     }
-  }
- ```
+  ]
+}
+```
 
-# **Using requests:**  
+### **4. Retrieve Results**  
+Extracted data is saved in `{mode}.json`:  
+```json
+{
+  "data": [
+    {"link": "https://www.skipthedishes.com/cities/calgary"},
+    {"link": "https://www.skipthedishes.com/cities/brandon"},
+    {"link": "https://www.skipthedishes.com/cities/welland"}
+  ],
+  "run_stats": {"status": "success", "message": null}
+}
+```
 
-In some cases, you may want to prevent the browser from opening and instead use the `requests` module for making HTTP requests. Rambot allows you to specify modes where browser automation is disabled, and requests are used instead.  
 
-#### **Example: Fetching Cities Without Opening a Browser**  
 
+## **HTTP Request Module**    
+### **Description**  
+This module allows sending HTTP requests with automatic error handling, logging, and retry attempts.
+
+### **Example Usage**  
+```python
+from module_name import request
+
+response = request(
+    method="GET",
+    url="http://example.com",
+    options={"headers": {"User-Agent": "CustomAgent"}, "timeout": 10},
+    max_retry=3,
+    retry_wait=2
+)
+```
+
+### **Using Proxies and Custom Headers**  
+```python
+response = request(
+    method="POST",
+    url="http://example.com/api",
+    options={
+        "proxies": {"http": "http://my-proxy.com:{port}", "https": "http://my-proxy.com:{port}"},
+        "json": {"key": "value"},
+        "headers": {"Authorization": "Bearer TOKEN"}
+    },
+    max_retry=5,
+    retry_wait=3
+)
+```
+
+### **Usage in a Scraper**  
 ```python
 from rambot.requests import requests
 from rambot.scraper import Scraper, bind
 from rambot.models import Document
-
 import typing
 
 class App(Scraper):
-
     def open(self, wait=True):
         if self.mode in ["cities"]:
-            return  # Prevent browser from opening for this mode
+            return  # Prevents browser from opening for this mode
         return super().open(wait)
 
     @bind(mode="cities")
@@ -151,7 +176,6 @@ class App(Scraper):
             retry_wait=1.25
         )
         elements = response.select("h4 div a")
-        
         return [
             Document(link=self.BASE_URL + href)
             for element in elements
@@ -159,11 +183,10 @@ class App(Scraper):
         ]
 ```
 
-#### **Key Features:**  
-- **Disabling Browser for Specific Modes**: The `open` method is overridden to prevent opening the browser for the `"cities"` mode.  
-- **Making HTTP Requests**: The `requests.send()` method is used to fetch data from a webpage.  
-- **Retry Mechanism**: Supports retrying failed requests with customizable `max_retry` and `retry_wait` parameters.  
-- **Extracting Links**: The response is parsed to extract relevant links.  
+### **Advantages**  
+- **Scraping without a browser**: Reduces resource consumption.
+- **Retry mechanism**: Minimizes failures.
+- **Fast data extraction**: Parses HTML directly with `requests`.
 
-This approach provides a more lightweight and efficient alternative when full browser automation is unnecessary. 🚀
+With Rambot, automate and optimize your data extractions efficiently! 🚀
 
