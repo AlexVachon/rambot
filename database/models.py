@@ -76,6 +76,7 @@ class BaseDocument(BaseMixin, Base):
         created_at (DateTime): Timestamp when record was created
     """
     __abstract__ = True
+    __tablename__ = None
 
     def __init__(self):
         """
