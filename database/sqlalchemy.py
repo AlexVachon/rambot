@@ -6,7 +6,7 @@ from .models import BaseDocument
 from contextlib import contextmanager
 from loguru import logger
 
-class DatabaseConnection:
+class SQLAlchemyConnection:
     """
     Manages database connections and operations using SQLAlchemy.
     
@@ -21,9 +21,14 @@ class DatabaseConnection:
         Session: Session maker bound to the engine
         metadata: SQLAlchemy MetaData object for table operations
         _tables (dict): Internal tracking of created tables
+    
+    Example:
+        ```python
+        database = SQLAlchemyConnection(url="sqlite:///example.db")
+        ```
     """
     
-    def __init__(self, db_url: str, echo: bool = False, pool_size: int = 5):
+    def __init__(self, url: str, echo: bool = False, pool_size: int = 5):
         """
         Initialize database connection settings.
         
@@ -34,7 +39,7 @@ class DatabaseConnection:
         """
         self.logger = logger
         
-        self.db_url = db_url
+        self.db_url = url
         self.echo = echo
         self.pool_size = pool_size
         self.engine = create_engine(
@@ -74,6 +79,12 @@ class DatabaseConnection:
         Raises:
             Exception: Any exception occurring during session operations, 
             which will cause the session to be rolled back.
+        
+        Example:
+        ```python
+        with database.session() as session:
+            ...
+        ```
         """
         try:
             BaseDocument.metadata.create_all(self.engine)

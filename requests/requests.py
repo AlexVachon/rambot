@@ -51,6 +51,26 @@ def request(
         MethodError: If an unsupported HTTP method is used.
         RequestFailure: If the request fails due to an unknown error or a request exception.
         OptionsError: If there is an issue with the provided options.
+    
+    Example:
+        ```python
+        content = requests(
+            method="GET",
+            url="http://example.com",
+            options={
+                "proxies": {
+                    "http": "http://my-proxy.com:{port}",
+                    "https": "http://my-proxy.com:{port}"
+                },
+                "timeout": 10,
+                "verify": False,
+                "os": "windows",
+                "browser": "chrome"
+            },
+            max_retry=10,
+            retry_wait=2.5
+        )
+        ```
     """
     
     logger.debug(f"Trying to load \"{url}\" ...")
