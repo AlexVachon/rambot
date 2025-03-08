@@ -1,3 +1,15 @@
 include README.md
 include LICENSE
-recursive-include rambot *
+include pyproject.toml
+
+exclude rambot/database/__pycache__/
+exclude rambot/http/__pycache__/
+exclude rambot/scraper/__pycache__/
+
+recursive-include rambot/database *.py
+recursive-include rambot/http *.py
+recursive-include rambot/scraper *.py
+
+graft rambot/database
+graft rambot/http
+graft rambot/scraper

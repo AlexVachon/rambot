@@ -1,3 +1,41 @@
 [build-system]
-requires = ["setuptools", "wheel"]
+requires = ["wheel", "setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
+
+[project]
+name = "rambot"
+version = "0.1.0"
+description = "Configurable web scraping framework designed to automate data extraction from web pages"
+authors = [
+    { name = "Alexandre Vachon", email = "alex.vachon@outlook.com" }
+]
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+    "License :: OSI Approved :: MIT License"
+]
+license = { file = "LICENSE" }
+dependencies = [
+    "botasaurus",
+    "sqlalchemy",
+    "loguru",
+    "pydantic-settings",
+    "pydantic",
+    "wheel"
+]
+
+[project.urls]
+Source = "https://github.com/AlexVachon/rambot"
+
+[tool.setuptools]
+packages = [
+    "rambot",
+    "rambot.database",
+    "rambot.http",
+    "rambot.scraper"
+]
+
+[tool.setuptools.exclude-package-data]
+"*" = ["__pycache__/*"]
