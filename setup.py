@@ -13,7 +13,7 @@ clean_pycache()
 
 setup(
     name='rambot',
-    version='0.1.0',
+    version='0.1.1',
     packages=find_packages(where='.', exclude=["*__pycache__*"]),
     url='https://github.com/AlexVachon/rambot',
     license='MIT',
