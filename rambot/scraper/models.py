@@ -109,17 +109,17 @@ class Mode(BaseModel):
     save: typing.Optional[typing.Callable[[typing.Any], None]] = Field(None, alias="save")
     document_input: typing.Optional[typing.Type[Document]] = Field(None, alias="document_input")
     
-    path: str   = Field(".", alias="path")
-    save_logs: bool = Field(False, alias="save_logs")
-    logs_output: typing.Optional[str] = Field(None, alias="logs_output")
+    log_directory: str   = Field(".", alias="log_directory")
+    enable_file_logging: bool = Field(False, alias="enable_file_logging")
+    log_file_name: typing.Optional[str] = Field(None, alias="log_file_name")
     
-    @field_validator("logs_output", mode="before")
+    @field_validator("log_file_name", mode="before")
     @classmethod
     def set_default_logs(cls, v, values):
         """
         Sets a default log output path if not provided.
 
-        If `logs_output` is not provided, the function sets the default log path based on the
+        If `log_file_name` is not provided, the function sets the default log path based on the
         mode name and the current date, appending it to the specified directory path.
 
         Args:
@@ -129,7 +129,7 @@ class Mode(BaseModel):
         Returns:
             str: The default or provided log output path.
         """
-        path = values.data.get("path", ".")
+        path = values.data.get("log_directory", ".")
         
         if v is None:
             mode = values.data.get('name')
@@ -159,9 +159,9 @@ class ScraperModeManager:
         input: typing.Optional[typing.Union[str, typing.Callable[[], typing.List[typing.Dict[str, typing.Any]]]]] = None,
         save: typing.Optional[typing.Callable[[typing.Any], None]] = None,
         document_input: typing.Optional[typing.Type[Document]] = None,
-        save_logs: bool = False,
-        logs_output: typing.Optional[str] = None,
-        path: str = '.'
+        enable_file_logging: bool = False,
+        log_file_name: typing.Optional[str] = None,
+        log_directory: str = '.'
     ):
         """
         Registers a new mode for the scraper.
@@ -187,9 +187,9 @@ class ScraperModeManager:
                 input=input, 
                 save=save,
                 document_input=document_input, 
-                save_logs=save_logs,
-                logs_output=logs_output,
-                path=path
+                enable_file_logging=enable_file_logging,
+                log_file_name=log_file_name,
+                log_directory=log_directory
             )
 
     @classmethod

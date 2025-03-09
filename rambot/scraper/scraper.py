@@ -37,7 +37,6 @@ class Scraper:
         self._driver: typing.Optional[Driver] = None
         
         self.logger = get_logger(__name__)
-        
         self.setup()
 
 
@@ -55,7 +54,7 @@ class Scraper:
         
         
     def setup_logging(self, mode: Mode):
-        update_logger_config(log_to_file=True, file_path=mode.logs_output) if mode.save_logs else update_logger_config(log_to_file=False)
+        update_logger_config(class_name=self.__class__.__name__, log_to_file=True, file_path=mode.log_file_name) if mode.enable_file_logging else update_logger_config(class_name=self.__class__.__name__, log_to_file=False)
         
         
     def run(self) -> typing.List[Document]:
@@ -324,9 +323,9 @@ def bind(
     input: typing.Optional[typing.Union[str, typing.Callable[[], typing.List[typing.Dict[str, typing.Any]]]]] = None,
     save: typing.Optional[typing.Callable[[typing.Any], None]] = None,
     document_input: typing.Optional[typing.Type[Document]] = None,
-    save_logs: bool = False,
-    logs_output: typing.Optional[str] = None,
-    path: str = "."
+    enable_file_logging: bool = False,
+    log_file_name: typing.Optional[str] = None,
+    log_directory: str = "."
 ) -> typing.Callable:
     """
     A decorator to register a function as a mode in the ScraperModeManager.
@@ -362,9 +361,9 @@ def bind(
             input,
             save,
             document_input,
-            save_logs,
-            logs_output,
-            path
+            enable_file_logging,
+            log_file_name,
+            log_directory
         )
         return func
     return decorator
