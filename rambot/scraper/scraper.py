@@ -10,11 +10,12 @@ from botasaurus_driver.driver import Element, Driver, Wait
 from ..logging_config import update_logger_config, get_logger
 
 from .models import Document, ScraperModeManager, ModeResult, ModeStatus, Mode
+from .exception_handler import ExceptionHandler
 
-from .config import ScraperConfig, ErrorConfig
+from .config import ScraperConfig
 
 from .exceptions import DriverError
-from .decorators import no_print, errors
+from .decorators import no_print
 
 import typing
 
@@ -23,22 +24,15 @@ class Scraper:
     
     mode_manager = ScraperModeManager()
     
-    ERRORS_CONFIG: ErrorConfig = {
-        "must_raise": lambda self: self.config.must_raise,
-        "create_logs": lambda self: self.config.create_error_logs
-    }
     
-    
-    def __init__(
-        self, 
-        config: ScraperConfig = None
-    ):        
-        self.config = config or ScraperConfig()
+    def __init__(self):        
         self._driver: typing.Optional[Driver] = None
-        
         self.logger = get_logger(__name__)
         
         self.setup()
+        
+        self.config_driver()
+        self.config_exceptions()
 
 
     def setup(self) -> None:
@@ -52,21 +46,59 @@ class Scraper:
         self.mode = self.args.mode
         
         self.setup_logging(mode=self.mode_manager.get_mode(self.mode))
-        
-        
+    
+    
+    def config_exceptions(self, must_raise_exceptions: typing.List[typing.Type[Exception]] = [Exception]) -> None:
+        """
+        Dynamically configure the exception handler with the list of exceptions to raise.
+        """
+        self.exception_handler = ExceptionHandler(must_raise_exceptions=must_raise_exceptions)
+    
+    
+    def config_driver(self, **kwargs):
+        """Configure the driver with default parameters, but allows modifications."""
+        self.config = ScraperConfig(
+            headless=kwargs.get("headless", False),
+            proxy=kwargs.get("proxy"),
+            profile=kwargs.get("profile"),
+            tiny_profile=kwargs.get("tiny_profile", False),
+            block_images=kwargs.get("block_images", False),
+            block_images_and_css=kwargs.get("block_images_and_css", False),
+            wait_for_complete_page_load=kwargs.get("wait_for_complete_page_load", False),
+            extensions=kwargs.get("extensions", []),
+            arguments=kwargs.get("arguments", []),
+            user_agent=kwargs.get("user_agent"),
+            lang=kwargs.get("lang"),
+            beep=kwargs.get("beep", False)
+        )
+
+
+    def update_config(self, **kwargs):
+        """Update the scraper configuration after initialization."""
+        for key, value in kwargs.items():
+            if hasattr(self.config, key):
+                setattr(self.config, key, value)
+            else:
+                self.logger.warning(f"Unknown configuration key: {key}")
+
+    
+    
     def setup_logging(self, mode: Mode):
-        update_logger_config(log_to_file=True, file_path=mode.logs_output) if mode.save_logs else update_logger_config(log_to_file=False)
+        update_logger_config(class_name=self.__class__.__name__, log_to_file=True, file_path=mode.log_file_name) if mode.enable_file_logging else update_logger_config(class_name=self.__class__.__name__, log_to_file=False)
         
         
     def run(self) -> typing.List[Document]:
-        if not hasattr(self, "args") or not hasattr(self.args, "mode"):
-            raise RuntimeError("Calling .run() without calling .setup() first")
+        try:
+            if not hasattr(self, "args") or not hasattr(self.args, "mode"):
+                raise RuntimeError("Calling .run() without calling .setup() first")
 
-        method = self.mode_manager.get_func(self.mode)
-        
-        decorated_method = scrape(method)
+            method = self.mode_manager.get_func(self.mode)
+            
+            decorated_method = scrape(method)
 
-        return decorated_method(self)
+            return decorated_method(self)
+        except Exception as e:
+            self.exception_handler.handle(e)
 
 
     @property
@@ -77,46 +109,49 @@ class Scraper:
 
 
     @no_print
-    @errors(**ERRORS_CONFIG)
     def open(
         self, 
         wait: bool = True
     ) -> None:
-        self.logger.debug("Opening browser ...")
-        
-        driver_config = {
-            "headless": self.config.headless if self.config.headless is not None else False,
-            "proxy": self.config.proxy if self.config.proxy is not None else "",
-            "profile": self.config.profile if self.config.profile is not None else None,
-            "tiny_profile": self.config.tiny_profile if self.config.tiny_profile is not None else False,
-            "block_images": self.config.block_images if self.config.block_images is not None else False,
-            "block_images_and_css": self.config.block_images_and_css if self.config.block_images_and_css is not None else False,
-            "wait_for_complete_page_load": wait,
-            "extensions": self.config.extensions if self.config.extensions else [],
-            "arguments": self.config.arguments if self.config.arguments else [
-                "--ignore-certificate-errors",
-                "--ignore-ssl-errors=yes"
-            ],
-            "user_agent": self.config.user_agent if self.config.user_agent else None,
-            "lang": self.config.lang if self.config.lang else "en",
-            "beep": self.config.beep if self.config.beep is not None else False,
-        }
-        self._driver = Driver(**driver_config)
-        
-        if not self._driver._tab:
-            raise DriverError("Can't initialize driver")
+        try:
+            self.logger.debug("Opening browser ...")
+            
+            driver_config = {
+                "headless": self.config.headless,
+                "proxy": self.config.proxy,
+                "profile": self.config.profile,
+                "tiny_profile": self.config.tiny_profile,
+                "block_images": self.config.block_images,
+                "block_images_and_css": self.config.block_images_and_css,
+                "wait_for_complete_page_load": wait,
+                "extensions": self.config.extensions,
+                "arguments": self.config.arguments if self.config.arguments else [
+                    "--ignore-certificate-errors",
+                    "--ignore-ssl-errors=yes"
+                ],
+                "user_agent": self.config.user_agent,
+                "lang": self.config.lang,
+                "beep": self.config.beep,
+            }
+            self._driver = Driver(**driver_config)
+            
+            if not self._driver._tab:
+                raise DriverError("Can't initialize driver")
+        except Exception as e:
+            self.exception_handler.handle(e)
         
         
     @no_print
-    @errors(**ERRORS_CONFIG)
     def close(self) -> None:
-        if self._driver is not None:
-            self.logger.debug("Closing browser...")
-            self._driver.close()
-            self._driver = None
+        try:
+            if self._driver is not None:
+                self.logger.debug("Closing browser...")
+                self._driver.close()
+                self._driver = None
+        except Exception as e:
+            self.exception_handler.handle(e)
+            
 
-
-    @errors(**ERRORS_CONFIG)
     def save(
         self,
         links: typing.List[Document],
@@ -128,11 +163,9 @@ class Scraper:
             self.write(data=formatted_data, mode_result=mode_result)
             self.logger.debug(f"Saved {len(formatted_data)} links")
         except Exception as e:
-            self.logger.error(f"Failed to save links: {e}")
-            raise
+            self.exception_handler.handle(e)
 
 
-    @errors(**ERRORS_CONFIG)
     def write(
         self,
         data: typing.List[typing.Type[Document]],
@@ -145,30 +178,32 @@ class Scraper:
                 json.dump({"data": data, "run_stats": {"status": mode_result.status.value, "message": mode_result.message}}, file, indent=4)
         
         except Exception as e:
-            self.logger.warning(f"Failed to write data to {filename}: {e}")
-            raise
+            self.exception_handler.handle(e)
 
 
-    @errors(**ERRORS_CONFIG)
     def read(
         self, 
         filename: str
     ) -> typing.Dict[str, typing.List[Document]]:
-        with open(filename, 'r') as file:
-            return json.load(file)
+        try:
+            with open(filename, 'r') as file:
+                return json.load(file)
+        except Exception as e:
+            self.exception_handler.handle(e)
 
 
-    @errors(**ERRORS_CONFIG)
     def create_document(
         self, 
         obj: typing.Dict[str, typing.Any], 
         document: typing.Type[Document]
     ) -> Document:
-        return document(**obj)
+        try:
+            return document(**obj)
+        except Exception as e:
+            self.exception_handler.handle(e)
 
 
     @no_print
-    @errors(**ERRORS_CONFIG)
     def get(
         self, 
         url: str, 
@@ -176,29 +211,38 @@ class Scraper:
         accept_cookies: bool = False, 
         wait: typing.Optional[int] = None
     ) -> None:
-        if self.driver.config.is_new:
-            self.driver.google_get(
-                link=url,
-                bypass_cloudflare=bypass_cloudflare,
-                accept_google_cookies=accept_cookies,
-                wait=wait
-            )
-            self.logger.debug("Page is loaded")
-        else:
-            response = self.driver.requests.get(url=url)
-            response.raise_for_status()
-            
-            self.logger.debug("Page is loaded")
-            
-            return response 
+        try:
+            if self.driver.config.is_new:
+                self.driver.google_get(
+                    link=url,
+                    bypass_cloudflare=bypass_cloudflare,
+                    accept_google_cookies=accept_cookies,
+                    wait=wait
+                )
+                self.logger.debug("Page is loaded")
+            else:
+                response = self.driver.requests.get(url=url)
+                response.raise_for_status()
+                
+                self.logger.debug("Page is loaded")
+                
+                return response
+        except Exception as e:
+            self.exception_handler.handle(e)
     
     
     def get_current_url(self) -> str:
-        return self.driver.current_url
+        try:
+            return self.driver.current_url
+        except Exception as e:
+            self.exception_handler.handle(e)
     
     
     def refresh(self) -> None:
-        self.driver.reload()
+        try:
+            self.driver.reload()
+        except Exception as e:
+            self.exception_handler.handle(e)
         
         
     def find_all(
@@ -324,9 +368,9 @@ def bind(
     input: typing.Optional[typing.Union[str, typing.Callable[[], typing.List[typing.Dict[str, typing.Any]]]]] = None,
     save: typing.Optional[typing.Callable[[typing.Any], None]] = None,
     document_input: typing.Optional[typing.Type[Document]] = None,
-    save_logs: bool = False,
-    logs_output: typing.Optional[str] = None,
-    path: str = "."
+    enable_file_logging: bool = True,
+    log_file_name: typing.Optional[str] = None,
+    log_directory: str = "."
 ) -> typing.Callable:
     """
     A decorator to register a function as a mode in the ScraperModeManager.
@@ -341,16 +385,16 @@ def bind(
             - A callable that returns a list of dictionaries.
         save (Optional[Callable[[Any], None]]): A function to save the results of the mode.
         document_input (Optional[Type[Document]]): The document type associated with this mode.
-        save_logs (bool): Whether to enable logging for this mode.
-        logs_output (Optional[str]): The output path for logs. If None, a default path is used.
-        path (str): The directory path where logs should be stored. Defaults to the current directory.
+        enable_file_logging (bool): Whether to enable logging for this mode.
+        log_file_name (Optional[str]): The output path for logs. If None, a default path is used.
+        log_directory (str): The directory path where logs should be stored. Defaults to the current directory.
 
     Returns:
         Callable: The original function, now registered as a mode.
 
     Example:
         ```python
-        @bind(mode="extract_data", save=my_save_function, save_logs=True)
+        @bind(mode="extract_data", save=my_save_function, log_directory="logs/mode_cities")
         def extract():
             return {"data": "example"}
         ```
@@ -362,9 +406,9 @@ def bind(
             input,
             save,
             document_input,
-            save_logs,
-            logs_output,
-            path
+            enable_file_logging,
+            log_file_name,
+            log_directory
         )
         return func
     return decorator
@@ -407,12 +451,8 @@ def scrape(func: typing.Callable) -> typing.Callable:
     """
     @wraps(func)
     def wrapper(self, *args, **kwargs) -> typing.List[Document]:
-        if not isinstance(self, Scraper):
-            raise TypeError(f"The @scrape decorator can only be used in a class inheriting from Scraper, not in {type(self).__name__}")
-
-        self.mode_manager.validate(self.mode)
-
         try:
+            self.mode_manager.validate(self.mode)
             self.logger.debug(f"Running scraper mode \"{self.mode}\"")
             self.open()
 
@@ -465,6 +505,8 @@ def scrape(func: typing.Callable) -> typing.Callable:
         except Exception as e:
             results = set()
             mode_result = ModeResult(status=ModeStatus.ERROR.value, message=str(e))
+
+            self.exception_handler.handle(e)
         finally:
             self.logger.debug(f"Run is {mode_result.status.value} {mode_result.message if mode_result.message else ''}")
 
