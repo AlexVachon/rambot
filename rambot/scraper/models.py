@@ -98,9 +98,9 @@ class Mode(BaseModel):
         input (Optional[Union[str, Callable]]): The input for the mode, which can be a string or a callable that returns a list of dictionaries.
         save (Optional[Callable[[Any], None]]): An optional function to save the results of this mode.
         document_input (Optional[Type[Document]]): The document input type associated with the mode.
-        path (str): The file path to store logs, defaults to the current directory.
-        save_logs (bool): Whether to save logs for this mode.
-        logs_output (Optional[str]): The output path for logs, can be None to use a default path.
+        log_directory (str): The file path to store logs, defaults to the current directory.
+        enable_file_logging (bool): Whether to save logs for this mode.
+        log_file_name (Optional[str]): The output path for logs, can be None to use a default path.
     """
     name: str = Field(alias="name")
     
@@ -175,9 +175,9 @@ class ScraperModeManager:
             input (Optional[Union[str, Callable]]): The input for the mode, which can be a string or a callable.
             save (Optional[Callable[[Any], None]]): A function to save the results of this mode.
             document_input (Optional[Type[Document]]): The document type associated with the mode.
-            save_logs (bool): Whether to save logs for this mode.
-            logs_output (Optional[str]): The output path for logs.
-            path (str): The directory path for logs, defaults to the current directory.
+            enable_file_logging (bool): Whether to save logs for this mode.
+            log_file_name (Optional[str]): The output path for logs.
+            log_directory (str): The directory path for logs, defaults to the current directory.
         """
 
         if name not in cls._modes:

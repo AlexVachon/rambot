@@ -1,19 +1,4 @@
-from typing import Type, List, Callable
-from typing_extensions import TypedDict
-
-
-class ErrorConfig(TypedDict, total=True):
-    """
-    A dictionary that defines the configuration for handling errors during scraping.
-
-    Attributes:
-        must_raise (Callable[[Type[Exception]], bool]): A function that takes an exception type and
-            returns whether that exception should be raised during scraping.
-        create_logs (Callable[[Type[Exception]], bool]): A function that takes an exception type and
-            returns whether logs should be created for that exception.
-    """
-    must_raise: Callable[[Type[Exception]], bool]
-    create_logs: Callable[[Type[Exception]], bool]
+import typing
 
 
 class ScraperConfig:
@@ -24,8 +9,6 @@ class ScraperConfig:
     browser options, and performance tuning.
 
     Attributes:
-        must_raise (List[Type[Exception]]): A list of exception types that should be raised during scraping.
-        create_error_logs (bool): Whether error logs should be created for scraping operations.
         headless (bool): Whether to run the browser in headless mode (without a GUI).
         proxy (str, optional): The proxy URL to use for the scraper, if any.
         profile (str, optional): The profile to use for the browser session, if any.
@@ -41,8 +24,6 @@ class ScraperConfig:
     """
     def __init__(
         self,
-        must_raise: List[Type[Exception]] = [Exception],
-        create_error_logs: bool = False,
         headless: bool = False,
         proxy: str = None,
         profile: str = None,
@@ -50,8 +31,8 @@ class ScraperConfig:
         block_images: bool = False,
         block_images_and_css: bool = False,
         wait_for_complete_page_load: bool = False,
-        extensions: List[str] = [],
-        arguments: List[str] = [],
+        extensions: typing.List[str] = [],
+        arguments: typing.List[str] = [],
         user_agent: str = None,
         lang: str = None,
         beep: bool = False,
@@ -60,10 +41,6 @@ class ScraperConfig:
         Initializes the ScraperConfig object with the specified configuration options.
 
         Args:
-            must_raise (List[Type[Exception]], optional): A list of exception types that should be raised
-                during scraping. Defaults to raising all exceptions.
-            create_error_logs (bool, optional): Whether to create error logs for scraping operations.
-                Defaults to False.
             headless (bool, optional): Whether to run the browser in headless mode. Defaults to False.
             proxy (str, optional): The proxy URL to use for the scraper. Defaults to None.
             profile (str, optional): The profile to use for the browser session. Defaults to None.
@@ -78,8 +55,7 @@ class ScraperConfig:
             lang (str, optional): The language setting for the scraper. Defaults to None.
             beep (bool, optional): Whether to play a beep sound when the scraping process is complete. Defaults to False.
         """
-        self.must_raise = must_raise
-        self.create_error_logs = create_error_logs
+        
         self.headless = headless
         self.proxy = proxy
         self.profile = profile
