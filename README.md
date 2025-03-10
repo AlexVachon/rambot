@@ -123,9 +123,9 @@ This module allows sending HTTP requests with automatic error handling, logging,
 
 ## **Example Usage**  
 ```python
-from module_name import request
+from rambot.http import requests
 
-response = request(
+response = requests.request(
     method="GET",
     url="http://example.com",
     options={"headers": {"User-Agent": "CustomAgent"}, "timeout": 10},
@@ -136,7 +136,7 @@ response = request(
 
 ## **Using Proxies and Custom Headers**  
 ```python
-response = request(
+response = requests.request(
     method="POST",
     url="http://example.com/api",
     options={
@@ -151,7 +151,7 @@ response = request(
 
 ## **Usage in a Scraper**  
 ```python
-from rambot.requests import requests
+from rambot.http import requests
 from rambot.scraper import Scraper, bind
 from rambot.models import Document
 import typing
@@ -164,7 +164,7 @@ class App(Scraper):
 
     @bind(mode="cities")
     def cities(self) -> typing.List[Document]:
-        response = requests.send(
+        response = requests.request(
             method="GET",
             url="https://www.skipthedishes.com/canada-food-delivery",
             options={"timeout": 15},
