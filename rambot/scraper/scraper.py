@@ -25,15 +25,13 @@ class Scraper:
     mode_manager = ScraperModeManager()
     
     
-    def __init__(
-        self, 
-        config: ScraperConfig = None
-    ):        
-        self.config = config or ScraperConfig()
+    def __init__(self):        
         self._driver: typing.Optional[Driver] = None
-        
         self.logger = get_logger(__name__)
+        
         self.setup()
+        
+        self.config_driver()
         self.config_exceptions()
 
 
@@ -56,7 +54,35 @@ class Scraper:
         """
         self.exception_handler = ExceptionHandler(must_raise_exceptions=must_raise_exceptions)
     
-        
+    
+    def config_driver(self, **kwargs):
+        """Configure the driver with default parameters, but allows modifications."""
+        self.config = ScraperConfig(
+            headless=kwargs.get("headless", False),
+            proxy=kwargs.get("proxy"),
+            profile=kwargs.get("profile"),
+            tiny_profile=kwargs.get("tiny_profile", False),
+            block_images=kwargs.get("block_images", False),
+            block_images_and_css=kwargs.get("block_images_and_css", False),
+            wait_for_complete_page_load=kwargs.get("wait_for_complete_page_load", False),
+            extensions=kwargs.get("extensions", []),
+            arguments=kwargs.get("arguments", []),
+            user_agent=kwargs.get("user_agent"),
+            lang=kwargs.get("lang"),
+            beep=kwargs.get("beep", False)
+        )
+
+
+    def update_config(self, **kwargs):
+        """Update the scraper configuration after initialization."""
+        for key, value in kwargs.items():
+            if hasattr(self.config, key):
+                setattr(self.config, key, value)
+            else:
+                self.logger.warning(f"Unknown configuration key: {key}")
+
+    
+    
     def setup_logging(self, mode: Mode):
         update_logger_config(class_name=self.__class__.__name__, log_to_file=True, file_path=mode.log_file_name) if mode.enable_file_logging else update_logger_config(class_name=self.__class__.__name__, log_to_file=False)
         
@@ -91,21 +117,21 @@ class Scraper:
             self.logger.debug("Opening browser ...")
             
             driver_config = {
-                "headless": self.config.headless if self.config.headless is not None else False,
-                "proxy": self.config.proxy if self.config.proxy is not None else "",
-                "profile": self.config.profile if self.config.profile is not None else None,
-                "tiny_profile": self.config.tiny_profile if self.config.tiny_profile is not None else False,
-                "block_images": self.config.block_images if self.config.block_images is not None else False,
-                "block_images_and_css": self.config.block_images_and_css if self.config.block_images_and_css is not None else False,
+                "headless": self.config.headless,
+                "proxy": self.config.proxy,
+                "profile": self.config.profile,
+                "tiny_profile": self.config.tiny_profile,
+                "block_images": self.config.block_images,
+                "block_images_and_css": self.config.block_images_and_css,
                 "wait_for_complete_page_load": wait,
-                "extensions": self.config.extensions if self.config.extensions else [],
+                "extensions": self.config.extensions,
                 "arguments": self.config.arguments if self.config.arguments else [
                     "--ignore-certificate-errors",
                     "--ignore-ssl-errors=yes"
                 ],
-                "user_agent": self.config.user_agent if self.config.user_agent else None,
-                "lang": self.config.lang if self.config.lang else "en",
-                "beep": self.config.beep if self.config.beep is not None else False,
+                "user_agent": self.config.user_agent,
+                "lang": self.config.lang,
+                "beep": self.config.beep,
             }
             self._driver = Driver(**driver_config)
             
