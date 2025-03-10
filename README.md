@@ -46,15 +46,14 @@ Rambot uses `ChromeDriver` for automated browsing. Install it based on your oper
 - Models structured data using `Document`.
 
 ### **4. Error Management & Logging**  
-- Centralized error handling with `ErrorConfig`.
+- Centralized error handling with `ExceptionHandler`.
 - Uses `loguru` for detailed and structured logging.
 
 ### **5. Scraping Throttling & Delays**  
 - Introduces randomized delays to mimic human behavior (`wait()`).
 - Ensures compliance with website rate limits.
 
-### **6. Useful Decorators**  
-- `@errors`: Structured error handling.
+### **6. Useful Decorators**
 - `@no_print`: Suppresses unwanted output.
 - `@scrape`: Enforces function structure in scraping processes.
 
@@ -80,16 +79,13 @@ class App(Scraper):
             for element in elements
             if (href := element.get_attribute("href"))
         ]
-```
 
-### **2. Run the Scraper**  
-```python
 if __name__ == "__main__":
     app = App()
     app.run()  # Executes the mode registered in launch.json
 ```
 
-### **3. Configure `launch.json` in VSCode**  
+### **2. Configure `launch.json` in VSCode**  
 ```json
 {
   "version": "0.2.0",
@@ -106,7 +102,7 @@ if __name__ == "__main__":
 }
 ```
 
-### **4. Retrieve Results**  
+### **3. Retrieve Results**  
 Extracted data is saved in `{mode}.json`:  
 ```json
 {
@@ -121,11 +117,11 @@ Extracted data is saved in `{mode}.json`:
 
 
 
-## **HTTP Request Module**    
-### **Description**  
+# **HTTP Request Module**    
+## **Description**  
 This module allows sending HTTP requests with automatic error handling, logging, and retry attempts.
 
-### **Example Usage**  
+## **Example Usage**  
 ```python
 from module_name import request
 
@@ -138,7 +134,7 @@ response = request(
 )
 ```
 
-### **Using Proxies and Custom Headers**  
+## **Using Proxies and Custom Headers**  
 ```python
 response = request(
     method="POST",
@@ -153,7 +149,7 @@ response = request(
 )
 ```
 
-### **Usage in a Scraper**  
+## **Usage in a Scraper**  
 ```python
 from rambot.requests import requests
 from rambot.scraper import Scraper, bind
@@ -183,10 +179,9 @@ class App(Scraper):
         ]
 ```
 
-### **Advantages**  
+## **Advantages**  
 - **Scraping without a browser**: Reduces resource consumption.
 - **Retry mechanism**: Minimizes failures.
 - **Fast data extraction**: Parses HTML directly with `requests`.
 
 With Rambot, automate and optimize your data extractions efficiently! 🚀
-
