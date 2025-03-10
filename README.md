@@ -13,7 +13,7 @@ Rambot is a versatile and configurable web scraping framework designed to automa
 
 ## **Installation**    
 ```bash
-pip install rambot
+pip install --upgrade rambot
 ```
 
 ### **ChromeDriver Dependency**  
