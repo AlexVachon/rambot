@@ -12,9 +12,33 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - uses: actions/setup-python@v5
+      - name: Wait for version update
+        run: |
+          echo "Waiting for version update..."
+          sleep 10  # Short delay to prevent race conditions
+          LATEST_COMMIT=$(git rev-parse HEAD)
+          
+          while true; do
+              git fetch origin master
+              REMOTE_COMMIT=$(git rev-parse origin/master)
+
+              if [ "$LATEST_COMMIT" != "$REMOTE_COMMIT" ]; then
+                  echo "New update detected, pulling changes..."
+                  git pull origin master
+                  break
+              fi
+
+              echo "Waiting for the update..."
+              sleep 5
+          done
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.x"
 
@@ -45,7 +69,7 @@ jobs:
       url: https://pypi.org/project/rambot/
 
     steps:
-      - name: Retrieve release distributions
+      - name: Download release distributions
         uses: actions/download-artifact@v4
         with:
           name: release-dists
