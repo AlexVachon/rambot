@@ -1,5 +1,6 @@
 import typing
-from datetime import date
+import hashlib
+from datetime import date, datetime, timezone
 
 from pydantic import BaseModel, Field, field_validator
 from enum import Enum
@@ -30,7 +31,8 @@ class Document(BaseModel):
             Computes a hash value for the document based on its link, making it hashable.
     """
 
-    link: str
+    link: str = Field("", alias="link")
+    
 
     def to_dict(self) -> typing.Dict[str, typing.Any]:
         """
@@ -279,3 +281,58 @@ class ModeResult(BaseModel):
     """
     status: ModeStatus = Field(ModeStatus.ERROR, alias="status")
     message: typing.Optional[str] = Field(None, alias="message")
+
+
+class ScrapedDocument(BaseModel):
+    """
+    A model representing a scraped document, including its source, origin, unique identifier, and creation timestamp.
+    
+    Attributes:
+        source (Optional[str]): The source from which the document was scraped. Defaults to None.
+        origin (Dict[str, str]): A dictionary containing information about the origin of the document, such as the scraping mode. Defaults to an empty dictionary.
+        document (Document): The actual Document object representing the scraped content.
+        unique_id (str): A unique identifier for the document, generated using an MD5 hash of the document's link.
+        created_at (datetime): The timestamp when the document was created, defaulting to the current UTC time.
+
+    Methods:
+        generate_unique_id(cls, link: str) -> str:
+            Generates a unique MD5 hash ID for a document based on its link.
+        
+        from_document(cls, document: Document, source: str, mode: str) -> "ScrapedDocument":
+            Creates an instance of the ScrapedDocument class from a Document object.
+        
+        to_dict(self) -> Dict[str, Any]:
+            Converts the ScrapedDocument instance into a dictionary format, with the creation timestamp formatted as a string.
+    """
+    source: typing.Optional[str] = Field(None, alias="source")
+    origin: typing.Dict[str, str] = Field({}, alias="origin")
+    
+    document: Document = Field(Document(), alias="document")
+    
+    unique_id: str = Field(default_factory=lambda: hashlib.md5().hexdigest())
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    @classmethod
+    def generate_unique_id(cls, link: str) -> str:
+        return hashlib.md5(link.encode()).hexdigest()
+    
+    @classmethod
+    def from_document(
+        cls, document: Document, source: str, mode: str
+    ) -> "ScrapedDocument":
+        return cls(
+            source=source,
+            origin={"mode": mode},
+            document=document,
+            unique_id=cls.generate_unique_id(document.link),
+            created_at=datetime.now(timezone.utc)
+        )
+    
+    def to_dict(self) -> typing.Dict[str, typing.Any]:
+        return {
+            "source": self.source,
+            "origin": self.origin,
+            "document": self.document.to_dict(),
+            "unique_id": self.unique_id,
+            "created_at": self.created_at.strftime('%Y-%m-%d %H:%M:%S.%f%z')
+        }

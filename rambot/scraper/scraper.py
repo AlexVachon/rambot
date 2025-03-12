@@ -9,7 +9,7 @@ from botasaurus_driver.driver import Element, Driver, Wait
 
 from ..logging_config import update_logger_config, get_logger
 
-from .models import Document, ScraperModeManager, ModeResult, ModeStatus, Mode
+from .models import Document, ScraperModeManager, ModeResult, ModeStatus, Mode, ScrapedDocument
 from .exception_handler import ExceptionHandler
 
 from .config import ScraperConfig
@@ -154,28 +154,28 @@ class Scraper:
 
     def save(
         self,
-        links: typing.List[Document],
-        mode_result: ModeResult
+        links: typing.List[ScrapedDocument]
     ) -> None:
         try:
-            formatted_data = [link.to_dict() for link in links]
-            
-            self.write(data=formatted_data, mode_result=mode_result)
-            self.logger.debug(f"Saved {len(formatted_data)} links")
+            self.write(data=links)
+            self.logger.debug(f"Saved {len(links)} links")
         except Exception as e:
             self.exception_handler.handle(e)
 
 
     def write(
         self,
-        data: typing.List[typing.Type[Document]],
-        mode_result: ModeResult
+        data: typing.List[ScrapedDocument]
     ) -> None:
         try:
             filename = f"{self.mode}.json"
             
             with open(filename, 'w') as file:
-                json.dump({"data": data, "run_stats": {"status": mode_result.status.value, "message": mode_result.message}}, file, indent=4)
+                json.dump(
+                    [d.to_dict() for d in data], 
+                    file, 
+                    indent=4
+                )
         
         except Exception as e:
             self.exception_handler.handle(e)
@@ -198,7 +198,7 @@ class Scraper:
         document: typing.Type[Document]
     ) -> Document:
         try:
-            return document(**obj)
+            return document(**obj.get("document", {}))
         except Exception as e:
             self.exception_handler.handle(e)
 
@@ -468,24 +468,35 @@ def scrape(func: typing.Callable) -> typing.Callable:
 
             if (input_file := mode_info.input):
                 if callable(input_file):
-                    input_list = {"data": input_file(self)}
+                    input_list = input_file(self)
                 else:
-                    input_list = {"data": [document_input(link=url).to_dict()]} if (url := self.args.url) else self.read(filename=input_file)
+                    input_list = [
+                        ScrapedDocument.from_document(
+                            document=document_input(link=url), 
+                            source=self.__class__.__name__, 
+                            mode="restaurant_details",
+                            source_mode="DEBUG"
+                            
+                        ).to_dict()
+                    ] if (url := self.args.url) else self.read(filename=input_file)
 
-                for d in input_list.get("data", []):
+                for d in input_list:
                     if document_input:
                         doc = self.create_document(obj=d, document=document_input)
 
                     self.logger.debug(f"Processing {doc}")
 
-                    result = method(doc, *args, **kwargs)
+                    try:
+                        result = method(doc, *args, **kwargs)
 
-                    if result:
-                        if not isinstance(result, list): result = [result]
-                        if not all(isinstance(r, Document) for r in result):
-                            raise TypeError(f"Expected List[Document], but got {type(result)} with elements {result}")
+                        if result:
+                            if not isinstance(result, list): result = [result]
+                            if not all(isinstance(r, Document) for r in result):
+                                raise TypeError(f"Expected List[Document], but got {type(result)} with elements {result}")
 
-                        results.update(result)
+                            results.update(result)
+                    except Exception as e:
+                        self.logger.error(f"Error processing {doc}: {str(e)}")
 
                     self.wait(1, 2)
             else:
@@ -499,21 +510,14 @@ def scrape(func: typing.Callable) -> typing.Callable:
                     raise TypeError(f"Expected List[Document], but got {type(result)} with elements {result}")
 
                 results.update(result)
-
-            mode_result = ModeResult(status=ModeStatus.SUCCESS.value)
-
         except Exception as e:
             results = set()
-            mode_result = ModeResult(status=ModeStatus.ERROR.value, message=str(e))
-
             self.exception_handler.handle(e)
         finally:
-            self.logger.debug(f"Run is {mode_result.status.value} {mode_result.message if mode_result.message else ''}")
-
             if save is not None:
-                save(self, list(results), mode_result)
+                save(self, list(results))
 
-            self.save(links=list(results), mode_result=mode_result)
+            self.save(links=list([ScrapedDocument.from_document(document=r, mode=self.mode, source=self.__class__.__name__) for r in results]))
             self.close()
 
             return list(results)
