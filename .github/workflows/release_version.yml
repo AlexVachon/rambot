@@ -1,0 +1,38 @@
+name: Bump Version on Release
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  bump_version:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout du repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Installer Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.x"
+
+      - name: Installer bump2version
+        run: pip install bump2version
+
+      - name: Extraire la version depuis le tag GitHub
+        run: |
+          TAG_VERSION=${{ github.event.release.tag_name }}
+          echo "TAG_VERSION=$TAG_VERSION" >> $GITHUB_ENV
+
+      - name: Mettre à jour la version
+        run: |
+          bump2version --new-version $TAG_VERSION patch
+
+      - name: Commit et push des changements
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git commit -am "Mise à jour de la version à $TAG_VERSION"
+          git push
