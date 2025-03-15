@@ -1,5 +1,6 @@
 # requirements.txt
 wheel
+mitmproxy
 botasaurus
 sqlalchemy
 loguru

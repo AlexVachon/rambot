@@ -1,3 +1,4 @@
+import os
 import json
 import time 
 import random
@@ -7,9 +8,14 @@ from functools import wraps
 
 from botasaurus_driver.driver import Element, Driver, Wait
 
+from ..helpers import helpers
+
+from .interceptor import start_mitmproxy, stop_mitmproxy
+from .interceptor.interceptor import get_requests
+
 from ..logging_config import update_logger_config, get_logger
 
-from .models import Document, ScraperModeManager, ModeResult, ModeStatus, Mode, ScrapedDocument
+from .models import Document, ScraperModeManager, Mode, ScrapedDocument
 from .exception_handler import ExceptionHandler
 
 from .config import ScraperConfig
@@ -24,16 +30,44 @@ class Scraper:
     
     mode_manager = ScraperModeManager()
     
+
+    def proxy_port(self) -> typing.Union[str, int]:
+        return "8080"
     
+
+    def proxy_host(self) -> str:
+        return "localhost"
+    
+
+    def proxy(
+        self,
+        username: typing.Optional[str] = None, 
+        password: typing.Optional[str] = None, 
+        include_scheme: bool = False, 
+        use_https_scheme: bool = False
+    ) -> typing.Dict[str, str]:
+        
+        return helpers.get_proxies(
+            host=self.proxy_host(),
+            port=self.proxy_port(),
+            username=username, 
+            password=password, 
+            include_scheme=include_scheme, 
+            use_https_scheme=use_https_scheme
+        )
+    
+
     def __init__(self):        
         self._driver: typing.Optional[Driver] = None
         self.logger = get_logger(__name__)
         
         self.setup()
         
-        self.config_driver()
-        self.config_exceptions()
+        self.setup_driver_config()
+        self.setup_exception_handler()
 
+        start_mitmproxy(proxy_port=self.proxy_port())
+        
 
     def setup(self) -> None:
         parser = argparse.ArgumentParser(description="Launch script with a specific mode")
@@ -48,32 +82,36 @@ class Scraper:
         self.setup_logging(mode=self.mode_manager.get_mode(self.mode))
     
     
-    def config_exceptions(self, must_raise_exceptions: typing.List[typing.Type[Exception]] = [Exception]) -> None:
+    def setup_exception_handler(self, must_raise_exceptions: typing.List[typing.Type[Exception]] = [Exception]) -> None:
         """
         Dynamically configure the exception handler with the list of exceptions to raise.
         """
         self.exception_handler = ExceptionHandler(must_raise_exceptions=must_raise_exceptions)
     
     
-    def config_driver(self, **kwargs):
+    def setup_driver_config(self, **kwargs):
         """Configure the driver with default parameters, but allows modifications."""
         self.config = ScraperConfig(
             headless=kwargs.get("headless", False),
-            proxy=kwargs.get("proxy"),
+            proxy=kwargs.get("proxy", self.proxy(include_scheme=True, use_https_scheme=True)["https"]),
             profile=kwargs.get("profile"),
             tiny_profile=kwargs.get("tiny_profile", False),
             block_images=kwargs.get("block_images", False),
             block_images_and_css=kwargs.get("block_images_and_css", False),
             wait_for_complete_page_load=kwargs.get("wait_for_complete_page_load", False),
             extensions=kwargs.get("extensions", []),
-            arguments=kwargs.get("arguments", []),
+            arguments=kwargs.get("arguments", [
+                "--ignore-certificate-errors",
+                "--ignore-ssl-errors=yes",
+                "--disable-blink-features=AutomationControlled"
+            ]),
             user_agent=kwargs.get("user_agent"),
             lang=kwargs.get("lang"),
             beep=kwargs.get("beep", False)
         )
 
 
-    def update_config(self, **kwargs):
+    def update_driver_config(self, **kwargs):
         """Update the scraper configuration after initialization."""
         for key, value in kwargs.items():
             if hasattr(self.config, key):
@@ -81,7 +119,6 @@ class Scraper:
             else:
                 self.logger.warning(f"Unknown configuration key: {key}")
 
-    
     
     def setup_logging(self, mode: Mode):
         update_logger_config(class_name=self.__class__.__name__, log_to_file=True, file_path=mode.log_file_name) if mode.enable_file_logging else update_logger_config(class_name=self.__class__.__name__, log_to_file=False)
@@ -96,7 +133,10 @@ class Scraper:
             
             decorated_method = scrape(method)
 
-            return decorated_method(self)
+            result = decorated_method(self)
+            stop_mitmproxy()
+            
+            return result
         except Exception as e:
             self.exception_handler.handle(e)
 
@@ -104,12 +144,12 @@ class Scraper:
     @property
     def driver(self) -> typing.Optional[Driver]:
         if not hasattr(self, '_driver') or not self._driver:
-            self.open()
+            self.open_browser()
         return self._driver
 
 
     @no_print
-    def open(
+    def open_browser(
         self, 
         wait: bool = True
     ) -> None:
@@ -137,12 +177,13 @@ class Scraper:
             
             if not self._driver._tab:
                 raise DriverError("Can't initialize driver")
+            
         except Exception as e:
             self.exception_handler.handle(e)
         
         
     @no_print
-    def close(self) -> None:
+    def close_browser(self) -> None:
         try:
             if self._driver is not None:
                 self.logger.debug("Closing browser...")
@@ -152,6 +193,202 @@ class Scraper:
             self.exception_handler.handle(e)
             
 
+
+    """
+        NAVIGATION FUNCTIONS
+    """
+
+    @no_print
+    def load_page(
+        self, 
+        url: str, 
+        bypass_cloudflare: bool = False,
+        accept_cookies: bool = False, 
+        wait: typing.Optional[int] = None
+    ) -> None:
+        try:
+            if self.driver.config.is_new:
+                self.driver.google_get(
+                    link=url,
+                    bypass_cloudflare=bypass_cloudflare,
+                    accept_google_cookies=accept_cookies,
+                    wait=wait
+                )
+                
+                self.logger.debug("Page is loaded")
+            else:
+                response = self.driver.requests.get(url=url)
+                response.raise_for_status()
+                
+                self.logger.debug("Page is loaded")
+                
+                return response
+        except Exception as e:
+            self.exception_handler.handle(e)
+    
+    
+    def get_current_url(self) -> str:
+        try:
+            return self.driver.current_url
+        except Exception as e:
+            self.exception_handler.handle(e)
+    
+    
+    def refresh_page(self) -> None:
+        try:
+            self.driver.reload()
+        except Exception as e:
+            self.exception_handler.handle(e)
+          
+    
+    def execute_script(self, script: str) -> typing.Any:
+        try:
+            return self.driver.run_js(script)
+        except Exception as e:
+            self.exception_handler.handle(e)
+    
+    
+    def navigate_back(self) -> None:
+        self.execute_script(script="window.history.back()")
+    
+    
+    def navigation_forward(self) -> None:
+        self.execute_script(script="window.history.forward()")
+    
+          
+    """
+        ELEMENT FUNCTIONS
+    """
+    
+    def select_all(
+        self, 
+        selector: str, 
+        timeout: int = 10
+    ) -> typing.List[Element]:
+        return self.driver.select_all(
+            selector=selector,
+            wait=timeout
+        )
+    
+    
+    def select(
+        self, 
+        selector: str, 
+        timeout: int = 10
+    ) -> Element:
+        return self.driver.select(
+            selector=selector,
+            wait=timeout
+        )
+        
+    
+    def click(
+        self,
+        selector: str,
+        element: typing.Optional[Element] = None,
+        wait: typing.Optional[int] = Wait.SHORT
+    ):
+        element.click(selector, wait) if element else self.driver.click(selector, wait)
+        
+    
+    def is_element_visible(
+        self, 
+        selector: str, 
+        wait: typing.Optional[int] = Wait.SHORT
+    ) -> bool:
+        return self.driver.is_element_present(selector, wait)
+    
+    
+    
+    """
+        STORAGE FUNCTIONS
+    """
+    
+    def get_cookies(self) -> typing.List[dict]:
+        return self.driver.get_cookies()
+    
+    
+    def add_cookies(
+        self, 
+        cookies: typing.List[dict]
+    ) -> None:
+        self.driver.add_cookies(cookies)
+    
+    
+    def delete_cookies(self) -> None:
+        self.driver.delete_cookies()
+
+
+    def get_local_storage(self) -> dict:
+        return self.driver.get_local_storage()
+
+
+    def add_local_storage(
+        self, 
+        local_storage: dict
+    ) -> None:
+        self.driver.add_local_storage(local_storage)
+
+
+    def delete_local_storage(self) -> None:
+        self.driver.delete_local_storage()
+        self.driver.element
+
+
+    """
+        SCROLL FUNCTIONS
+    """
+
+    def scroll(
+        self,
+        selector: typing.Optional[str] = None,
+        by: int = 1000,
+        smooth_scroll: bool = True,
+        wait: typing.Optional[int] = Wait.SHORT
+    ) -> None:
+        self.driver.scroll(selector, by, smooth_scroll, wait)
+    
+    
+    def scroll_to_bottom(
+        self,
+        selector: typing.Optional[str] = None,
+        smooth_scrolling: bool = True,
+        wait: typing.Optional[int] = Wait.SHORT
+    ) -> None:
+        self.driver.scroll_to_bottom(selector, smooth_scrolling, wait)
+
+
+    def scroll_to_element(
+        self, 
+        selector: str, 
+        wait: typing.Optional[int] = Wait.SHORT
+    ) -> None:
+        self.driver.scroll_into_view(selector, wait)
+
+
+    
+    """
+        REQUESTS FUNCTIONS
+    """
+
+    def get_requests(self):
+        return get_requests()
+
+
+    """
+        UTILS FUNCTIONS
+    """
+    
+    def wait(
+        self, 
+        min: float = 0.1, 
+        max: float = 1
+    ) -> None:
+        delay = random.uniform(min, max)
+        self.logger.debug(f"Waiting {delay}s ...")
+        time.sleep(delay)
+        
+        
     def save(
         self,
         links: typing.List[ScrapedDocument]
@@ -201,164 +438,8 @@ class Scraper:
             return document(**obj.get("document", {}))
         except Exception as e:
             self.exception_handler.handle(e)
-
-
-    @no_print
-    def get(
-        self, 
-        url: str, 
-        bypass_cloudflare: bool = False,
-        accept_cookies: bool = False, 
-        wait: typing.Optional[int] = None
-    ) -> None:
-        try:
-            if self.driver.config.is_new:
-                self.driver.google_get(
-                    link=url,
-                    bypass_cloudflare=bypass_cloudflare,
-                    accept_google_cookies=accept_cookies,
-                    wait=wait
-                )
-                self.logger.debug("Page is loaded")
-            else:
-                response = self.driver.requests.get(url=url)
-                response.raise_for_status()
-                
-                self.logger.debug("Page is loaded")
-                
-                return response
-        except Exception as e:
-            self.exception_handler.handle(e)
-    
-    
-    def get_current_url(self) -> str:
-        try:
-            return self.driver.current_url
-        except Exception as e:
-            self.exception_handler.handle(e)
-    
-    
-    def refresh(self) -> None:
-        try:
-            self.driver.reload()
-        except Exception as e:
-            self.exception_handler.handle(e)
         
         
-    def find_all(
-        self, 
-        selector: str, 
-        timeout: int = 10
-    ) -> typing.List[Element]:
-        return self.driver.select_all(
-            selector=selector,
-            wait=timeout
-        )
-    
-    
-    def find(
-        self, 
-        selector: str, 
-        timeout: int = 10
-    ) -> Element:
-        return self.driver.select(
-            selector=selector,
-            wait=timeout
-        )
-    
-    
-    def wait(
-        self, 
-        min: float = 0.1, 
-        max: float = 1
-    ) -> None:
-        delay = random.uniform(min, max)
-        self.logger.debug(f"Waiting {delay}s ...")
-        time.sleep(delay)
-
-    
-    def click(
-        self,
-        selector: str,
-        element: typing.Optional[Element] = None,
-        wait: typing.Optional[int] = Wait.SHORT
-    ):
-        element.click(selector, wait) if element else self.driver.click(selector, wait)
-        
-    
-    def wait_element(
-        self, 
-        selector: str, 
-        wait: typing.Optional[int] = Wait.SHORT
-    ) -> bool:
-        return self.driver.is_element_present(selector, wait)
-    
-    
-    def get_cookies(self) -> typing.List[dict]:
-        return self.driver.get_cookies()
-    
-    
-    def add_cookies(
-        self, 
-        cookies: typing.List[dict]
-    ) -> None:
-        self.driver.add_cookies(cookies)
-    
-    
-    def delete_cookies(self) -> None:
-        self.driver.delete_cookies()
-
-
-    def get_local_storage(self) -> dict:
-        return self.driver.get_local_storage()
-
-
-    def add_local_storage(
-        self, 
-        local_storage: dict
-    ) -> None:
-        self.driver.add_local_storage(local_storage)
-
-
-    def delete_local_storage(self) -> None:
-        self.driver.delete_local_storage()
-        self.driver.element
-
-
-    def navigate_back(self):
-        pass
-
-
-    def navigate_forward(self):
-        pass
-    
-    
-    def scroll(
-        self,
-        selector: typing.Optional[str] = None,
-        by: int = 1000,
-        smooth_scroll: bool = True,
-        wait: typing.Optional[int] = Wait.SHORT
-    ) -> None:
-        self.driver.scroll(selector, by, smooth_scroll, wait)
-    
-    
-    def scroll_bottom(
-        self,
-        selector: typing.Optional[str] = None,
-        smooth_scrolling: bool = True,
-        wait: typing.Optional[int] = Wait.SHORT
-    ) -> None:
-        self.driver.scroll_to_bottom(selector, smooth_scrolling, wait)
-
-
-    def scroll_by(
-        self, 
-        selector: str, 
-        wait: typing.Optional[int] = Wait.SHORT
-    ) -> None:
-        self.driver.scroll_into_view(selector, wait)
-
 
 """
 Scraper decorators
@@ -453,9 +534,7 @@ def scrape(func: typing.Callable) -> typing.Callable:
     def wrapper(self, *args, **kwargs) -> typing.List[Document]:
         try:
             self.mode_manager.validate(self.mode)
-            self.logger.debug(f"Running scraper mode \"{self.mode}\"")
-            self.open()
-
+            
             mode_info = self.mode_manager.get_mode(self.mode)
             if mode_info.func is None:
                 raise ValueError(f"No function associated with mode '{self.mode}'")
@@ -463,6 +542,10 @@ def scrape(func: typing.Callable) -> typing.Callable:
             method = mode_info.func.__get__(self, type(self))
             document_input = mode_info.document_input
             save = mode_info.save
+
+
+            self.logger.debug(f"Running scraper mode \"{self.mode}\"")
+            self.open_browser()
 
             results = set()
 
@@ -518,7 +601,7 @@ def scrape(func: typing.Callable) -> typing.Callable:
                 save(self, list(results))
 
             self.save(links=list([ScrapedDocument.from_document(document=r, mode=self.mode, source=self.__class__.__name__) for r in results]))
-            self.close()
+            self.close_browser()
 
             return list(results)
 
