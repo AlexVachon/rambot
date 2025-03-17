@@ -18,16 +18,44 @@ pip install --upgrade rambot
 
 ### **ChromeDriver Dependency**  
 Rambot uses `ChromeDriver` for automated browsing. Install it based on your operating system:  
+
 - **Windows**: [Download ChromeDriver here](https://sites.google.com/chromium.org/driver/downloads) and add it to your `PATH`.
+
 - **macOS**: Install via Homebrew:  
   ```bash
   brew install chromedriver
   ```
-- **Linux**: Install via APT:  
-  ```bash
-  sudo apt install chromium-chromedriver
-  ```
 
+- **Linux**:  
+  1. Install Chrome (if not already installed):
+     ```bash
+     wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+     sudo dpkg -i google-chrome-stable_current_amd64.deb
+     sudo apt-get -f install
+     ```
+
+  2. Install ChromeDriver:
+     ```bash
+     sudo apt install chromium-chromedriver
+     ```
+
+  3. Verify Chrome installation:
+     ```bash
+     google-chrome --version
+     ```
+
+  4. (Optional) Add Chrome to `PATH` if needed:
+     ```bash
+     export PATH=$PATH:/usr/bin
+     ```
+
+### **Verify Installation**:
+To verify that Chrome and ChromeDriver are working correctly, run the following:
+  ```bash
+  google-chrome --remote-debugging-port=9222 --headless --disable-gpu --no-sandbox
+  curl http://127.0.0.1:9222/json/version
+  ```
+You should receive a response with the version details of Chrome.
 
 
 ## **Key Features**    
