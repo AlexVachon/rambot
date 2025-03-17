@@ -1,8 +1,8 @@
 import json
 from mitmproxy import http
 
-from . import temp_file
-print(f"tempfile: {temp_file}")
+# from . import temp_file
+# print(f"tempfile: {temp_file}")
 
 requests = []
 
@@ -25,7 +25,7 @@ def request(flow: http.HTTPFlow) -> None:
     }
 
     requests.append(request_data)
-    temp_file.write("hi\n")
+    # temp_file.write("hi\n")
 
     save_requests_to_file()
 

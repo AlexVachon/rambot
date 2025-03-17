@@ -3,7 +3,7 @@ import subprocess
 import tempfile
 import os
 
-temp_file = tempfile.NamedTemporaryFile(mode="w", suffix=".txt", dir=os.getcwd())
+# temp_file = tempfile.NamedTemporaryFile(mode="w", suffix=".txt", dir=os.getcwd())
 
 def start_mitmproxy(proxy_port: str = "8080"):
     """
@@ -23,3 +23,4 @@ def stop_mitmproxy():
     """
     subprocess.call(['pkill', 'mitmdump'])
     # os.remove("captured_requests.json")
+    # temp_file.close()
