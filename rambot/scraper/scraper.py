@@ -27,14 +27,39 @@ import typing
 
 
 class Scraper:
+    """
+    A class for scraping data from websites using a configurable browser and various scraping modes.
+
+    The `Scraper` class facilitates the configuration of a scraping session, including setting up the browser, logging, proxies, and mode-based operations. It integrates exception handling, allows custom configurations, and supports interacting with web elements such as clicking, selecting, and scrolling. Additionally, it manages data storage, including saving and loading scraped data, and supports proxy configuration.
+
+    Attributes:
+        mode_manager (ScraperModeManager): Manages different scraper modes and their associated functions.
+        logger (Logger): The logger used for recording information and errors during the scraping process.
+        config (ScraperConfig): The configuration settings for the scraper instance.
+        exception_handler (ExceptionHandler): Handles exceptions during the scraping process.
+    """
     
     mode_manager = ScraperModeManager()
+
+
+    def __init__(self):        
+        self._driver: typing.Optional[Driver] = None
+        self.logger = get_logger(__name__)
+        
+        self.setup()
+        
+        self.setup_driver_config()
+        self.setup_exception_handler()
     
+
+    """
+        PROXY FONCTIONS
+    """
 
     def proxy_port(self) -> typing.Union[str, int]:
         return "8080"
     
-
+ 
     def proxy_host(self) -> str:
         return "localhost"
     
@@ -55,19 +80,7 @@ class Scraper:
             include_scheme=include_scheme, 
             use_https_scheme=use_https_scheme
         )
-    
 
-    def __init__(self):        
-        self._driver: typing.Optional[Driver] = None
-        self.logger = get_logger(__name__)
-        
-        self.setup()
-        
-        self.setup_driver_config()
-        self.setup_exception_handler()
-
-        start_mitmproxy(proxy_port=self.proxy_port())
-        
 
     def setup(self) -> None:
         parser = argparse.ArgumentParser(description="Launch script with a specific mode")
@@ -93,7 +106,7 @@ class Scraper:
         """Configure the driver with default parameters, but allows modifications."""
         self.config = ScraperConfig(
             headless=kwargs.get("headless", False),
-            proxy=kwargs.get("proxy", self.proxy(include_scheme=True, use_https_scheme=True)["https"]),
+            proxy=kwargs.get("proxy", f"http://{self.proxy_host()}:{self.proxy_port()}"),
             profile=kwargs.get("profile"),
             tiny_profile=kwargs.get("tiny_profile", False),
             block_images=kwargs.get("block_images", False),
@@ -125,9 +138,26 @@ class Scraper:
         
         
     def run(self) -> typing.List[Document]:
+        """
+        Executes the scraping process based on the mode specified in the command-line arguments.
+
+        This function depends on the "--mode" argument passed in the `launch.json` configuration. 
+        It initializes and runs `mitmproxy`, retrieves the appropriate scraping method using 
+        `mode_manager.get_func(self.mode)`, applies the `scrape` decorator, and executes the 
+        decorated method.
+
+        Returns:
+            list[Document]: A list of extracted documents.
+
+        Raises:
+            RuntimeError: If called without first executing `.setup()`.
+            Exception: Any unexpected errors are handled by `self.exception_handler.handle(e)`.
+        """
         try:
             if not hasattr(self, "args") or not hasattr(self.args, "mode"):
                 raise RuntimeError("Calling .run() without calling .setup() first")
+
+            start_mitmproxy(proxy_port=self.proxy_port())
 
             method = self.mode_manager.get_func(self.mode)
             
@@ -285,10 +315,9 @@ class Scraper:
     def click(
         self,
         selector: str,
-        element: typing.Optional[Element] = None,
         wait: typing.Optional[int] = Wait.SHORT
     ):
-        element.click(selector, wait) if element else self.driver.click(selector, wait)
+        self.driver.click(selector, wait)
         
     
     def is_element_visible(
@@ -557,9 +586,7 @@ def scrape(func: typing.Callable) -> typing.Callable:
                         ScrapedDocument.from_document(
                             document=document_input(link=url), 
                             source=self.__class__.__name__, 
-                            mode="restaurant_details",
-                            source_mode="DEBUG"
-                            
+                            mode="restaurant_details"
                         ).to_dict()
                     ] if (url := self.args.url) else self.read(filename=input_file)
 
