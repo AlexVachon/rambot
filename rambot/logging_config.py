@@ -20,7 +20,7 @@ def update_logger_config(
     """
     global current_format
 
-    format_str = current_format.format(class_name=class_name)
+    format_str = current_format.replace("{class_name}", class_name)
 
     logger.remove()
 
