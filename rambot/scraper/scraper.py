@@ -10,8 +10,7 @@ from botasaurus_driver.driver import Element, Driver, Wait
 
 from ..helpers import helpers
 
-from .interceptor import start_mitmproxy, stop_mitmproxy
-from .interceptor.interceptor import get_requests
+from .interceptor import Interceptor, addons
 
 from ..logging_config import update_logger_config, get_logger
 
@@ -45,7 +44,9 @@ class Scraper:
     def __init__(self):        
         self._driver: typing.Optional[Driver] = None
         self.logger = get_logger(__name__)
-        
+        self.interceptor = Interceptor(scraper=self)
+        # self._mitmproxy_interceptor = addons[0]
+
         self.setup()
         
         self.setup_driver_config()
@@ -157,14 +158,14 @@ class Scraper:
             if not hasattr(self, "args") or not hasattr(self.args, "mode"):
                 raise RuntimeError("Calling .run() without calling .setup() first")
 
-            start_mitmproxy(proxy_port=self.proxy_port())
+            self.interceptor.start()
 
             method = self.mode_manager.get_func(self.mode)
             
             decorated_method = scrape(method)
 
             result = decorated_method(self)
-            stop_mitmproxy()
+            self.interceptor.stop()
             
             return result
         except Exception as e:
@@ -395,13 +396,19 @@ class Scraper:
         self.driver.scroll_into_view(selector, wait)
 
 
-    
     """
         REQUESTS FUNCTIONS
     """
 
     def get_requests(self):
-        return get_requests()
+        if not self.requests_path or not os.path.exists(self.requests_path):
+            return []
+        
+        try:
+            with open(self.requests_path, 'r') as file:
+                return [json.loads(line) for line in file.readlines()]
+        except Exception:
+            return []
 
 
     """
