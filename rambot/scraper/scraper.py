@@ -172,15 +172,15 @@ class Scraper(IScraper):
                 self.driver.google_get(
                     link=url,
                     bypass_cloudflare=bypass_cloudflare,
-                    accept_google_cookies=accept_cookies,
-                    wait=wait
+                    accept_google_cookies=accept_cookies
                 )
-
+                self.sleep(time=wait)
                 self.logger.debug("Page is loaded")
             else:
                 response = self.driver.requests.get(url=url)
                 response.raise_for_status()
 
+                self.sleep(time=wait)
                 self.logger.debug("Page is loaded")
 
                 return response
@@ -236,24 +236,18 @@ class Scraper(IScraper):
     def scroll_to_element(self, selector, wait=Wait.SHORT): self.driver.scroll_into_view(selector, wait)
 
 
-    # ---- Requests ----
-    def get_requests(self):
-        if not getattr(self, "requests_path", None) or not os.path.exists(self.requests_path):
-            return []
-        try:
-            with open(self.requests_path, 'r') as file:
-                return [json.loads(line) for line in file.readlines()]
-        except Exception:
-            return []
-
-
     # ---- Utils ----
+    def sleep(self, t: Optional[float] = None):
+        if t is None:
+            return
+        self.logger.debug(f"Waiting {t}s ...")
+        time.sleep(t)
+
     def wait(self, min=0.1, max=1):
         delay = random.uniform(min, max)
         self.logger.debug(f"Waiting {delay}s ...")
 
         time.sleep(delay)
-
 
     def save(self, links):
         try:
@@ -262,7 +256,6 @@ class Scraper(IScraper):
         except Exception as e:
             self.exception_handler.handle(e)
 
-
     def write(self, data):
         try:
             with open(f"{self.mode}.json", 'w') as file:
@@ -270,14 +263,12 @@ class Scraper(IScraper):
         except Exception as e:
             self.exception_handler.handle(e)
 
-
     def read(self, filename):
         try:
             with open(filename, 'r') as file:
                 return json.load(file)
         except Exception as e:
             self.exception_handler.handle(e)
-
 
     def create_document(self, obj, document):
         try:

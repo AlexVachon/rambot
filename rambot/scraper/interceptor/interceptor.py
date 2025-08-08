@@ -1,65 +1,57 @@
 import os
 import time
 import json
-import tempfile
 import subprocess
+from typing import List
+
+from ...types.interceptor import IInterceptor
 
 
-class Interceptor:
-
-    def __init__(self, scraper):
-        self._scraper = scraper
-        self._requests_path = os.path.join(tempfile.gettempdir(), f"__{self._scraper.__class__.__name__.lower()}_requests.json")
+class Interceptor(IInterceptor):
 
 
     def start(self) -> None:
-        """
-        Start mitmproxy in a separate process with custom env.
-        """
         try:
             os.remove(self._requests_path)
         except FileNotFoundError:
             pass
 
-        def run_mitmproxy():
+        script_path = os.path.abspath(
+            os.path.join(os.path.dirname(__file__), "mitmproxy_interceptor.py")
+        )
 
-            script_path = os.path.abspath(
-                os.path.join(os.path.dirname(__file__), "mitmproxy_interceptor.py")
-            )
+        mitmproxy_command = [
+            "mitmdump",
+            "-s", script_path,
+            "--set", f"requests_path={self._requests_path}",
+            "--listen-port", str(self._scraper.proxy_port()),
+            "--quiet"
+        ]
 
-            mitmproxy_command = [
-                "mitmdump",
-                "-s", script_path,
-                "--set", f"requests_path={self._requests_path}",
-                "--listen-port", self._scraper.proxy_port(),
-                "--quiet"
-            ]
+        env = os.environ.copy()
+        env["REQUESTS_PATH"] = self._requests_path
 
-            env = os.environ.copy()
-            env["REQUESTS_PATH"] = self._requests_path
-
-            subprocess.Popen(mitmproxy_command, env=env)
-            time.sleep(2)
-
-        run_mitmproxy()
+        subprocess.Popen(mitmproxy_command, env=env)
+        self.logger.debug(
+            "Requests interceptor started ...",
+        )
+        self._scraper.sleep(time=2)
 
 
-    def get_requests(self) -> list:
+    def stop(self) -> None:
+        try:
+            os.remove(self._requests_path)
+        except FileNotFoundError:
+            pass
+        subprocess.call(["pkill", "mitmdump"])
+        self.logger.debug(
+            "Requests interceptor stopped.",
+        )
+
+    
+    def get_requests(self) -> List[dict]:
         if not os.path.exists(self._requests_path):
             return []
 
         with open(self._requests_path, "r") as f:
-            requests = [json.loads(line) for line in f.readlines()]
-
-        return requests
-
-
-    def stop(self) -> None:
-        """
-        Stop mitmproxy
-        """
-        try:
-            os.remove(self._requests_path)
-        except FileNotFoundError:
-            pass
-        subprocess.call(['pkill', 'mitmdump'])
+            return [json.loads(line) for line in f if line.strip()]
