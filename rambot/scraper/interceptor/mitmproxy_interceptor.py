@@ -1,6 +1,6 @@
-from mitmproxy import ctx, http
 import json
 import os
+from mitmproxy import ctx, http
 
 
 class MITMProxyInterceptor:
@@ -9,31 +9,33 @@ class MITMProxyInterceptor:
         self.requests_path = None
 
     def load(self, loader):
-        self.requests_path = getattr(ctx.options, "requests_path", None)
-
-        if not self.requests_path:
-            self.requests_path = os.getenv("REQUESTS_PATH")
-
+        self.requests_path = getattr(ctx.options, "requests_path", None) or os.getenv("REQUESTS_PATH")
         ctx.log.info(f"[Interceptor] requests_path = {self.requests_path}")
 
-    def request(self, flow: http.HTTPFlow):
+    def response(self, flow: http.HTTPFlow):
         if not self.requests_path:
             return
 
         entry = {
-            "url": flow.request.pretty_url,
-            "method": flow.request.method,
-            "headers": dict(flow.request.headers),
-            "timestamp": flow.request.timestamp_start,
+            "request": {
+                "method": flow.request.method,
+                "url": flow.request.url,
+                "headers": dict(flow.request.headers),
+                "body": flow.request.get_text()
+            },
+            "response": {
+                "url": flow.request.url,  # match requests.Response
+                "status_code": flow.response.status_code,
+                "headers": dict(flow.response.headers),
+                "body": flow.response.get_text()
+            }
         }
 
         try:
-            with open(self.requests_path, "a") as f:
-                f.write(json.dumps(entry) + "\n")
+            with open(self.requests_path, "a", encoding="utf-8") as f:
+                f.write(json.dumps(entry, ensure_ascii=False) + "\n")
         except Exception as e:
-            ctx.log.warn(f"[Interceptor] Failed to log request: {e}")
+            ctx.log.warn(f"[Interceptor] Failed to log request/response: {e}")
 
 
-addons = [
-    MITMProxyInterceptor()
-]
+addons = [MITMProxyInterceptor()]

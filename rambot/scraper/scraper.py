@@ -173,13 +173,13 @@ class Scraper(IScraper):
                     bypass_cloudflare=bypass_cloudflare,
                     accept_google_cookies=accept_cookies
                 )
-                self.sleep(time=wait)
+                self.sleep(t=wait)
                 self.logger.debug("Page is loaded")
             else:
                 response = self.driver.requests.get(url=url)
                 response.raise_for_status()
 
-                self.sleep(time=wait)
+                self.sleep(t=wait)
                 self.logger.debug("Page is loaded")
 
                 return response

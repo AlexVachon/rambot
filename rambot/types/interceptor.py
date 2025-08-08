@@ -45,7 +45,7 @@ class IInterceptor(ABC):
         pass
 
     @abstractmethod
-    def get_requests(self) -> List[dict]:
+    def requests(self) -> List[dict]:
         """
         Retrieve all captured requests.
 
