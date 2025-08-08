@@ -1,3 +1,3 @@
 from .scraper import IScraper
 from .interceptor import IInterceptor
-from .response import Response, Request
+from .request import Response, Request
