@@ -6,7 +6,9 @@ import argparse
 from functools import wraps
 from typing import Optional, List, Dict, Callable, Type, Union, Any
 
-from botasaurus_driver.driver import Driver, Wait
+from botasaurus_driver.driver import Driver, Wait, Element, make_element
+from botasaurus_driver import cdp
+from botasaurus_driver.core import util, element
 
 from ..helpers import helpers
 from ..logging_config import update_logger_config, get_logger
@@ -16,7 +18,7 @@ from .exception_handler import ExceptionHandler
 from .config import ScraperConfig
 from .exceptions import DriverError
 from .decorators import no_print
-from ..types import IScraper
+from ..types import IScraper, By
 
 
 class Scraper(IScraper):
@@ -204,9 +206,66 @@ class Scraper(IScraper):
 
 
     # ---- Elements ----
-    def select_all(self, selector, timeout=10): return self.driver.select_all(selector=selector, wait=timeout)
+    def find(self, query: str, by: By = By.XPATH, root: Optional[Element] = None, first: bool = False, timeout: int = 10) -> Optional[Union[Element, List[Element]]]:
+        if by == By.CSS:
+            elements = root.select_all(query, wait=timeout) if root else self.driver.select_all(query, wait=timeout)
+        elif by == By.XPATH:
+            elements = self._find_by_xpath(query=query, root=root, timeout=timeout)
+        elif by == By.ID:
+            elements = root.select_all(f"#{query}", wait=timeout) if root else self.driver.select_all(f"#{query}", wait=timeout)
+        else:
+            raise ValueError(f"Unsupported locator type: {by}")
 
-    def select(self, selector, timeout=10): return self.driver.select(selector=selector, wait=timeout)
+        if first:
+            if not elements:
+                raise Exception("No element found")
+            return elements[0]
+        return elements
+
+    def _find_by_xpath(self, query: str, root: Optional[Element] = None, timeout: int = 10) -> List[Element]:
+        results = []
+        start_time = time.time()
+        poll_interval = 0.1
+
+        while True:
+            results.clear()
+
+            if root is not None:
+                doc = root._elem._node
+            else:
+                doc = self.driver._tab.send(cdp.dom.get_document(depth=-1, pierce=True))
+
+            search_id, result_count = self.driver._tab.send(
+                cdp.dom.perform_search(query=query)
+            )
+
+            if result_count > 0:
+                node_ids = self.driver._tab.send(
+                    cdp.dom.get_search_results(
+                        search_id=search_id,
+                        from_index=0,
+                        to_index=result_count
+                    )
+                )
+
+                for node_id in node_ids:
+                    node = util.filter_recurse(doc, lambda n: n.node_id == node_id)
+                    if not node:
+                        continue
+                    internal_element = element.create(node, self.driver._tab, doc)
+                    elem = make_element(self, self.driver._tab, internal_element)
+                    results.append(elem)
+
+                if results:
+                    return results
+
+            elapsed = time.time() - start_time
+            if elapsed >= timeout:
+                break
+
+            time.sleep(poll_interval)
+
+        return results
 
     def click(self, selector, wait=Wait.SHORT): self.driver.click(selector, wait)
 

@@ -1,8 +1,17 @@
 from abc import ABC, abstractmethod
+from enum import Enum
+
 from typing import Optional, List, Dict, Type, Union, Any
 
 from botasaurus_driver.driver import Element, Wait, Driver
 from ..scraper.models import Document, ScrapedDocument, Mode
+
+
+class By(Enum):
+    CSS = "css"
+    XPATH = "xpath"
+    ID = "id"
+    CLASS_NAME = "class_name"
 
 
 class IScraper(ABC):
@@ -119,13 +128,13 @@ class IScraper(ABC):
 
     # ---- Elements ----
     @abstractmethod
-    def select_all(self, selector: str, timeout: int = 10) -> List[Element]:
-        """Select all matching elements."""
+    def find(self, query: str, by: By = By.XPATH, root: Optional[Element] = None, first: bool = False, timeout: int = 10) -> Optional[Union[Element, List[Element]]]:
+        """Find a single element by CSS selector or XPath."""
         pass
 
     @abstractmethod
-    def select(self, selector: str, timeout: int = 10) -> Element:
-        """Select a single element."""
+    def _find_by_xpath(self, query: str, root: Optional[Element] = None, timeout: int = 10) -> List[Element]:
+        """Find elements by XPath."""
         pass
 
     @abstractmethod
