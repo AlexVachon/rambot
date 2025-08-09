@@ -1,3 +1,5 @@
+from typing import List, TypeVar, Callable, Any
+
 class Response:
     def __init__(self, url: str, status_code: int, headers: dict, body: str):
         self.url = url
@@ -95,3 +97,12 @@ class Request:
 
     def __repr__(self):
         return f"<Request [{self.method}] url=\"{self.url}\">"
+    
+T = TypeVar('T', bound= 'Request')
+class Requests(List[T]):
+    def count(self) -> int:
+        return len(self)
+    
+    def map(self, func: Callable[[T], Any]) -> List[Any]:
+        """Apply a function to each request and return a list of results."""
+        return [func(req) for req in self]

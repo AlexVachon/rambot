@@ -3,10 +3,10 @@ import json
 import tempfile
 
 from abc import ABC, abstractmethod
-from typing import List, Optional, Callable, Dict, Any, Tuple
+from typing import Optional, Callable, List
 
 from .scraper import IScraper
-from .request import Response, Request
+from .request import Response, Request, Requests
 
 
 class IInterceptor(ABC):
@@ -49,7 +49,7 @@ class IInterceptor(ABC):
     def requests(
         self,
         predicate: Optional[Callable[[Request], bool]] = None
-    ) -> List[Request]:
+    ) -> Requests:
         """
         Retrieve all captured requests, optionally filtered by a predicate.
 
@@ -59,7 +59,7 @@ class IInterceptor(ABC):
                 should be included in the result. If None, all requests are returned.
 
         Returns:
-            List[Request]: List of captured Request objects that satisfy the predicate.
+            Requests: List of captured Request objects that satisfy the predicate.
         """
         pass
     
@@ -107,23 +107,3 @@ class IInterceptor(ABC):
                 except json.JSONDecodeError as e:
                     pass
         return requests_list
-
-    @abstractmethod
-    def find_first(self, predicate: Callable[[Request], bool], requests: Optional[List[Request]] = None) -> Optional[Request]:
-        """Find the first request matching the given predicate."""
-        pass
-
-    @abstractmethod
-    def map_requests(self, func: Callable[[Request], Any], requests: Optional[List[Request]] = None) -> List[Any]:
-        """Apply a function to each request and return the list of results."""
-        pass
-
-    @abstractmethod
-    def count_by_method(self, requests: Optional[List[Request]] = None) -> Dict[str, int]:
-        """Count requests by HTTP method."""
-        pass
-
-    @abstractmethod
-    def count_by_status_code(self, requests: Optional[List[Request]] = None) -> Dict[int, int]:
-        """Count requests by response status code."""
-        pass
