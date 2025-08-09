@@ -336,3 +336,6 @@ class ScrapedDocument(BaseModel):
             "unique_id": self.unique_id,
             "created_at": self.created_at.strftime('%Y-%m-%d %H:%M:%S.%f%z')
         }
+    
+
+mode_manager = ScraperModeManager()

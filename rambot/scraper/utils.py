@@ -1,7 +1,7 @@
 from functools import wraps
 from typing import Callable, Dict, List, Optional, Union, Type, Any, Set
 
-from .models import Document, ScrapedDocument, ScraperModeManager
+from .models import Document, ScrapedDocument, mode_manager
 
 
 def bind(
@@ -41,7 +41,7 @@ def bind(
         ```
     """
     def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
-        ScraperModeManager.register(
+        mode_manager.register(
             name=mode,
             func=func,
             input=input,

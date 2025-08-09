@@ -15,7 +15,7 @@ from ..types import IScraper, By
 
 from .utils import scrape
 from .interceptor import Interceptor
-from .models import ScraperModeManager, Mode
+from .models import mode_manager as mode_manager_instance, Mode
 from .exception_handler import ExceptionHandler
 from .config import ScraperConfig
 from .exceptions import DriverError
@@ -23,7 +23,7 @@ from .exceptions import DriverError
 
 class Scraper(IScraper):
 
-    mode_manager = ScraperModeManager()
+    mode_manager = mode_manager_instance
 
     def __init__(self):
         self._driver: Optional[Driver] = None
