@@ -22,6 +22,7 @@ class Interceptor(IInterceptor):
             "-s", script_path,
             "--set", f"requests_path={self._requests_path}",
             "--listen-port", str(self._scraper.proxy_port()),
+            "--ssl-insecure",
             "--quiet"
         ]
 

@@ -167,21 +167,22 @@ class Scraper(IScraper):
 
 
     # ---- Navigation ----
-    def load_page(self, url, bypass_cloudflare=False, accept_cookies=False, wait=None):
+    @helpers.no_print
+    def load_page(self, url, bypass_cloudflare=False, accept_cookies=False, wait=5, timeout=30):
         try:
             if self.driver.config.is_new:
                 self.driver.google_get(
                     link=url,
                     bypass_cloudflare=bypass_cloudflare,
-                    accept_google_cookies=accept_cookies
+                    accept_google_cookies=accept_cookies,
+                    wait=wait,
+                    timeout=timeout
                 )
-                self.sleep(t=wait)
                 self.logger.debug("Page is loaded")
             else:
                 response = self.driver.requests.get(url=url)
                 response.raise_for_status()
 
-                self.sleep(t=wait)
                 self.logger.debug("Page is loaded")
 
                 return response

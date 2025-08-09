@@ -97,7 +97,7 @@ class IScraper(ABC):
 
     # ---- Navigation ----
     @abstractmethod
-    def load_page(self, url: str, bypass_cloudflare: bool = False, accept_cookies: bool = False, wait: Optional[int] = None) -> None:
+    def load_page(self, url: str, bypass_cloudflare: bool = False, accept_cookies: bool = False, wait: Optional[int] = None, timeout: Optional[int] = 5) -> None:
         """Load a page in the browser, optionally bypassing Cloudflare or accepting cookies."""
         pass
 
