@@ -29,8 +29,6 @@ class Interceptor(IInterceptor):
         env["REQUESTS_PATH"] = self._requests_path
 
         subprocess.Popen(mitmproxy_command, env=env)
-        self.logger.debug("Requests interceptor started ...")
-        self._scraper.sleep(t=2)
 
     def stop(self) -> None:
         try:
@@ -38,7 +36,6 @@ class Interceptor(IInterceptor):
         except FileNotFoundError:
             pass
         subprocess.call(["pkill", "mitmdump"])
-        self.logger.debug("Requests interceptor stopped.")
 
     def requests(self) -> List[Request]:
         if not os.path.exists(self._requests_path):
@@ -72,7 +69,7 @@ class Interceptor(IInterceptor):
 
                     requests_list.append(request_obj)
                 except json.JSONDecodeError as e:
-                    self.logger.warning(f"Failed to parse request log line: {e}")
+                    pass
 
         return requests_list
 

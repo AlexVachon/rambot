@@ -3,22 +3,22 @@ import time
 import random
 import argparse
 
-from functools import wraps
-from typing import Optional, List, Dict, Callable, Type, Union, Any
+from typing import Optional, List
 
 from botasaurus_driver.driver import Driver, Wait, Element, make_element
 from botasaurus_driver import cdp
 from botasaurus_driver.core import util, element
 
-from ..helpers import helpers
+from .. import helpers
 from ..logging_config import update_logger_config, get_logger
+from ..types import IScraper, By
+
+from .utils import scrape
 from .interceptor import Interceptor
-from .models import Document, ScraperModeManager, Mode, ScrapedDocument
+from .models import ScraperModeManager, Mode
 from .exception_handler import ExceptionHandler
 from .config import ScraperConfig
 from .exceptions import DriverError
-from .decorators import no_print
-from ..types import IScraper, By
 
 
 class Scraper(IScraper):
@@ -128,7 +128,7 @@ class Scraper(IScraper):
             self.open_browser()
         return self._driver
 
-    @no_print
+    @helpers.no_print
     def open_browser(self, wait=True):
         try:
             self.logger.debug("Opening browser ...")
@@ -155,7 +155,7 @@ class Scraper(IScraper):
         except Exception as e:
             self.exception_handler.handle(e)
 
-    @no_print
+    @helpers.no_print
     def close_browser(self):
         try:
             self.logger.debug("Closing browser...")
@@ -206,7 +206,9 @@ class Scraper(IScraper):
 
 
     # ---- Elements ----
-    def find(self, query: str, by: By = By.XPATH, root: Optional[Element] = None, first: bool = False, timeout: int = 10) -> Optional[Union[Element, List[Element]]]:
+    def find(self, query, by = By.XPATH, root = None, first: bool = False, timeout = 10):
+        elements = []
+
         if by == By.SELECTOR:
             elements = root.select_all(query, wait=timeout) if root else self.driver.select_all(query, wait=timeout)
         elif by == By.XPATH:
@@ -220,7 +222,7 @@ class Scraper(IScraper):
             return elements[0]
         return elements
 
-    def _find_by_xpath(self, query: str, root: Optional[Element] = None, timeout: int = 10) -> List[Element]:
+    def _find_by_xpath(self, query, root = None, timeout = 10) -> List[Element]:
         results = []
         start_time = time.time()
         poll_interval = 0.1
@@ -265,7 +267,7 @@ class Scraper(IScraper):
 
         return results
 
-    def click(self, query: str, by: By = By.XPATH, timeout: int = Wait.SHORT) -> bool:
+    def click(self, query, by = By.XPATH, timeout = Wait.SHORT) -> bool:
         try:
             element = self.find(query, by=by, first=True, timeout=timeout)
             if not element:
@@ -301,7 +303,7 @@ class Scraper(IScraper):
 
 
     # ---- Utils ----
-    def sleep(self, t: Optional[float] = None):
+    def sleep(self, t = None):
         if t is None:
             return
         self.logger.debug(f"Waiting {t}s ...")
@@ -339,168 +341,3 @@ class Scraper(IScraper):
             return document(**obj.get("document", {}))
         except Exception as e:
             self.exception_handler.handle(e)
-
-
-"""
-Scraper decorators
-"""
-def bind(
-    mode: str, 
-    input: Optional[Union[str, Callable[[], List[Dict[str, Any]]]]] = None,
-    save: Optional[Callable[[Any], None]] = None,
-    document_input: Optional[Type[Document]] = None,
-    enable_file_logging: bool = True,
-    log_file_name: Optional[str] = None,
-    log_directory: str = "."
-) -> Callable:
-    """
-    A decorator to register a function as a mode in the ScraperModeManager.
-
-    This decorator allows binding a function to a specific mode with optional input processing, 
-    saving functionality, logging configuration, and document input type.
-
-    Args:
-        mode (str): The name of the mode to register.
-        input (Optional[Union[str, Callable]]): The input source for the mode, which can be:
-            - A string representing an input source.
-            - A callable that returns a list of dictionaries.
-        save (Optional[Callable[[Any], None]]): A function to save the results of the mode.
-        document_input (Optional[Type[Document]]): The document type associated with this mode.
-        enable_file_logging (bool): Whether to enable logging for this mode.
-        log_file_name (Optional[str]): The output path for logs. If None, a default path is used.
-        log_directory (str): The directory path where logs should be stored. Defaults to the current directory.
-
-    Returns:
-        Callable: The original function, now registered as a mode.
-
-    Example:
-        ```python
-        @bind(mode="extract_data", save=my_save_function, log_directory="logs/mode_cities")
-        def extract():
-            return {"data": "example"}
-        ```
-    """
-    def decorator(func: Callable) -> Callable:
-        Scraper.mode_manager.register(
-            mode, 
-            func, 
-            input,
-            save,
-            document_input,
-            enable_file_logging,
-            log_file_name,
-            log_directory
-        )
-        return func
-    return decorator
-
-
-def scrape(func: Callable) -> Callable:
-    """
-    A decorator for handling the scraping process in a class inheriting from Scraper.
-
-    This decorator ensures that the function is executed within a properly managed scraping 
-    session, including validation, logging, input handling, and saving results.
-
-    Args:
-        func (Callable): The function to be decorated, expected to process and return a list of `Document` objects.
-
-    Returns:
-        Callable: A wrapped function that manages the scraping process.
-
-    Raises:
-        TypeError: If the decorator is used on a class that does not inherit from `Scraper`.
-        ValueError: If no function is associated with the current mode.
-        TypeError: If the function does not return a list of `Document` instances.
-
-    Functionality:
-        - Validates that the `Scraper` class is being used.
-        - Retrieves the mode's configuration from `ScraperModeManager`.
-        - Processes input data, either from a callable or a file.
-        - Calls the mode’s associated function, ensuring it returns a list of `Document` objects.
-        - Handles logging and exceptions.
-        - Saves the results using the mode's `save` function (if provided) and the scraper’s `save` method.
-
-    Example:
-        ```python
-        class MyScraper(Scraper):
-            @scrape
-            def my_scraper_function(self, document: Document):
-                # Process the document and return results
-                return document
-        ```
-    """
-    @wraps(func)
-    def wrapper(self, *args, **kwargs) -> List[Document]:
-        try:
-            self.mode_manager.validate(self.mode)
-            
-            mode_info = self.mode_manager.get_mode(self.mode)
-            if mode_info.func is None:
-                raise ValueError(f"No function associated with mode '{self.mode}'")
-
-            method = mode_info.func.__get__(self, type(self))
-            document_input = mode_info.document_input
-            save = mode_info.save
-
-
-            self.logger.debug(f"Running scraper mode \"{self.mode}\"")
-            self.open_browser()
-
-            results = set()
-
-            if (input_file := mode_info.input):
-                if callable(input_file):
-                    input_list = input_file(self)
-                else:
-                    input_list = [
-                        ScrapedDocument.from_document(
-                            document=document_input(link=url), 
-                            source=self.__class__.__name__, 
-                            mode="restaurant_details"
-                        ).to_dict()
-                    ] if (url := self.args.url) else self.read(filename=input_file)
-
-                for d in input_list:
-                    if document_input:
-                        doc = self.create_document(obj=d, document=document_input)
-
-                    self.logger.debug(f"Processing {doc}")
-
-                    try:
-                        result = method(doc, *args, **kwargs)
-
-                        if result:
-                            if not isinstance(result, list): result = [result]
-                            if not all(isinstance(r, Document) for r in result):
-                                raise TypeError(f"Expected List[Document], but got {type(result)} with elements {result}")
-
-                            results.update(result)
-                    except Exception as e:
-                        self.logger.error(f"Error processing {doc}: {str(e)}")
-
-                    self.wait(1, 2)
-            else:
-                result = method(*args, **kwargs)
-                if not isinstance(result, (list, set)):
-                    result = {result}
-                else:
-                    result = set(result)
-
-                if not all(isinstance(r, Document) for r in result):
-                    raise TypeError(f"Expected List[Document], but got {type(result)} with elements {result}")
-
-                results.update(result)
-        except Exception as e:
-            results = set()
-            self.exception_handler.handle(e)
-        finally:
-            if save is not None:
-                save(self, list(results))
-
-            self.save(links=list([ScrapedDocument.from_document(document=r, mode=self.mode, source=self.__class__.__name__) for r in results]))
-            self.close_browser()
-
-            return list(results)
-
-    return wrapper

@@ -4,7 +4,7 @@ from enum import Enum
 from typing import Optional, List, Dict, Type, Union, Any
 
 from botasaurus_driver.driver import Element, Wait, Driver
-from ..scraper.models import Document, ScrapedDocument, Mode
+from ..scraper.models import Document, ScrapedDocument, Mode, ScraperModeManager
 
 
 class By(Enum):
@@ -16,6 +16,8 @@ class IScraper(ABC):
     """Interface for a web scraper with browser automation, request interception, 
     and multi-mode operation.
     """
+
+    mode_manager: ScraperModeManager
 
     # ---- Proxy ----
     @abstractmethod
@@ -126,7 +128,7 @@ class IScraper(ABC):
 
     # ---- Elements ----
     @abstractmethod
-    def find(self, query: str, by: By = By.XPATH, root: Optional[Element] = None, first: bool = False, timeout: int = 10) -> Optional[Union[Element, List[Element]]]:
+    def find(self, query: str, by: By = By.XPATH, root: Optional[Element] = None, first: bool = False, timeout: int = 10) -> Union[Element, List[Element]]:
         """Find a single element by CSS selector or XPath."""
         pass
 

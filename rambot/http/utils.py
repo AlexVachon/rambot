@@ -1,9 +1,9 @@
 from botasaurus_requests import Response
 from botasaurus.soupify import soupify, BeautifulSoup
-
 from typing import Union, Dict, Any
 
 from .exceptions import ParsingError
+
 
 def parse_response(response: Response) -> Union[Dict[str, Any], BeautifulSoup, str, Response]:
     """

@@ -1,4 +1,3 @@
-import sys
 from .utils import parse_response
 
 from ..logging_config import get_logger
@@ -8,7 +7,7 @@ from requests.exceptions import RequestException
 
 from .exceptions import MethodError, RequestFailure, OptionsError
 from .models import ALLOWED_METHODS, RequestOptions, ResponseContent, normalize_headers
-from .decorators import no_print
+from ..helpers import no_print
 
 from pydantic import HttpUrl
 

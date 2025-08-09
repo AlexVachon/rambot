@@ -1,8 +1,7 @@
-from botasaurus_requests import Response
-
 import typing
-from typing_extensions import Literal
 
+from botasaurus_requests import Response
+from typing_extensions import Literal
 from bs4 import BeautifulSoup
 
 
