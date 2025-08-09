@@ -8,10 +8,8 @@ from ..scraper.models import Document, ScrapedDocument, Mode
 
 
 class By(Enum):
-    CSS = "css"
     XPATH = "xpath"
-    ID = "id"
-    CLASS_NAME = "class_name"
+    SELECTOR = "selector"
 
 
 class IScraper(ABC):
@@ -138,7 +136,7 @@ class IScraper(ABC):
         pass
 
     @abstractmethod
-    def click(self, selector: str, wait: Optional[int] = Wait.SHORT):
+    def click(self, query: str, by: By = By.XPATH, timeout=Wait.SHORT) -> bool:
         """Click an element."""
         pass
 

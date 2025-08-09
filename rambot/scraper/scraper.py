@@ -207,12 +207,10 @@ class Scraper(IScraper):
 
     # ---- Elements ----
     def find(self, query: str, by: By = By.XPATH, root: Optional[Element] = None, first: bool = False, timeout: int = 10) -> Optional[Union[Element, List[Element]]]:
-        if by == By.CSS:
+        if by == By.SELECTOR:
             elements = root.select_all(query, wait=timeout) if root else self.driver.select_all(query, wait=timeout)
         elif by == By.XPATH:
             elements = self._find_by_xpath(query=query, root=root, timeout=timeout)
-        elif by == By.ID:
-            elements = root.select_all(f"#{query}", wait=timeout) if root else self.driver.select_all(f"#{query}", wait=timeout)
         else:
             raise ValueError(f"Unsupported locator type: {by}")
 
@@ -267,7 +265,15 @@ class Scraper(IScraper):
 
         return results
 
-    def click(self, selector, wait=Wait.SHORT): self.driver.click(selector, wait)
+    def click(self, query: str, by: By = By.XPATH, timeout: int = Wait.SHORT) -> bool:
+        try:
+            element = self.find(query, by=by, first=True, timeout=timeout)
+            if not element:
+                return False
+            self.driver.click(element, wait=timeout)
+            return True
+        except Exception as e:
+            return False
 
     def is_element_visible(self, selector, wait=Wait.SHORT): return self.driver.is_element_present(selector, wait)
 
