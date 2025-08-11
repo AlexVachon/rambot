@@ -12,7 +12,7 @@ from .request import Response, Request, Requests
 class IInterceptor(ABC):
     """Interface for a request interceptor used in web scraping."""
 
-    _scraper: "IScraper"
+    _scraper: IScraper
     _requests_path: str
 
     def __init__(self, scraper: IScraper) -> None:

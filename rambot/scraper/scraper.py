@@ -5,11 +5,13 @@ import argparse
 
 from typing import Optional
 
-from botasaurus_driver.driver import Driver, Wait
+from botasaurus_driver.driver import Wait
+from ..browser.driver import Driver
+from .html import HTML
 
 from .. import helpers
 from ..logging_config import update_logger_config, get_logger
-from ..types import IScraper, By
+from ..types import IScraper
 
 from .utils import scrape
 from .interceptor import Interceptor
@@ -24,7 +26,6 @@ class Scraper(IScraper):
     mode_manager = mode_manager_instance
 
     def __init__(self):
-        self._driver: Optional[Driver] = None
         self.logger = get_logger(__name__)
         self._interceptor = Interceptor(scraper=self)
         self.setup()
@@ -205,35 +206,13 @@ class Scraper(IScraper):
 
 
     # ---- Elements ----
-    def find(self, query, by = By.XPATH, root = None, first: bool = False, timeout = 10):
-        elements = []
+    @property
+    def html(self):
+        if not self._html:
+            self._html = HTML(driver=self.driver)
+        return self._html
 
-        if by == By.SELECTOR:
-            elements = root.select_all(query, wait=timeout) if root else self.driver.select_all(query, wait=timeout)
-        elif by == By.XPATH:
-            elements = self._find_by_xpath(query=query, root=root, timeout=timeout)
-        else:
-            raise ValueError(f"Unsupported locator type: {by}")
-
-        if first:
-            if not elements:
-                raise Exception("No element found")
-            return elements[0]
-        return elements
-
-    def click(self, query, by = By.XPATH, timeout = Wait.SHORT) -> bool:
-        try:
-            element = self.find(query, by=by, first=True, timeout=timeout)
-            if not element:
-                return False
-            self.driver.click(element, wait=timeout)
-            return True
-        except Exception as e:
-            return False
-
-    def is_element_visible(self, selector, wait=Wait.SHORT): return self.driver.is_element_present(selector, wait)
-
-
+    
     # ---- Storage ----
     def get_cookies(self): return self.driver.get_cookies()
 

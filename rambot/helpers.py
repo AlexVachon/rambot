@@ -8,6 +8,12 @@ import contextlib
 from functools import wraps
 from datetime import date, datetime, timezone
 from typing import Dict, Optional
+from enum import Enum
+
+
+class By(Enum):
+    XPATH = "xpath"
+    SELECTOR = "selector"
 
 
 USER_AGENTS = [

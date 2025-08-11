@@ -1,20 +1,12 @@
-import time
-
-from enum import Enum
 from abc import ABC, abstractmethod
 
 from typing import Optional, List, Dict, Type, Union, Any
 
-from botasaurus_driver.driver import Element, Wait, Driver, make_element
-from botasaurus_driver import cdp
-from botasaurus_driver.core import util, element
+from botasaurus_driver.driver import Wait
 
+from .html import IHTML
 from ..scraper.models import Document, ScrapedDocument, Mode, ScraperModeManager
-
-
-class By(Enum):
-    XPATH = "xpath"
-    SELECTOR = "selector"
+from ..browser.driver import Driver
 
 
 class IScraper(ABC):
@@ -23,6 +15,8 @@ class IScraper(ABC):
     """
 
     mode_manager: ScraperModeManager
+    _driver: Optional[Driver] = None
+    _html: Optional[IHTML] = None
 
     # ---- Proxy ----
     @abstractmethod
@@ -132,65 +126,10 @@ class IScraper(ABC):
         pass
 
     # ---- Elements ----
+    @property
     @abstractmethod
-    def find(self, query: str, by: By = By.XPATH, root: Optional[Element] = None, first: bool = False, timeout: int = 10) -> Union[Element, List[Element]]:
-        """Find a single element by CSS selector or XPath."""
-        pass
-
-    def _find_by_xpath(self, query: str, root: Optional[Element] = None, timeout: int = 10) -> List[Element]:
-        """Find elements by XPath."""
-        results = []
-        start_time = time.time()
-        poll_interval = 0.1
-
-        while True:
-            results.clear()
-
-            if root is not None:
-                doc = root._elem._node
-            else:
-                doc = self.driver._tab.send(cdp.dom.get_document(depth=-1, pierce=True))
-
-            search_id, result_count = self.driver._tab.send(
-                cdp.dom.perform_search(query=query)
-            )
-
-            if result_count > 0:
-                node_ids = self.driver._tab.send(
-                    cdp.dom.get_search_results(
-                        search_id=search_id,
-                        from_index=0,
-                        to_index=result_count
-                    )
-                )
-
-                for node_id in node_ids:
-                    node = util.filter_recurse(doc, lambda n: n.node_id == node_id)
-                    if not node:
-                        continue
-                    internal_element = element.create(node, self.driver._tab, doc)
-                    elem = make_element(self, self.driver._tab, internal_element)
-                    results.append(elem)
-
-                if results:
-                    return results
-
-            elapsed = time.time() - start_time
-            if elapsed >= timeout:
-                break
-
-            time.sleep(poll_interval)
-
-        return results
-
-    @abstractmethod
-    def click(self, query: str, by: By = By.XPATH, timeout=Wait.SHORT) -> bool:
-        """Click an element."""
-        pass
-
-    @abstractmethod
-    def is_element_visible(self, selector: str, wait: Optional[int] = Wait.SHORT) -> bool:
-        """Return True if the element is visible."""
+    def html(self) -> IHTML:
+        """Return the HTML interface for element interaction."""
         pass
 
     # ---- Storage ----
