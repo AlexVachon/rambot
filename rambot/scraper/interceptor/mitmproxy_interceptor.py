@@ -8,7 +8,7 @@ class MITMProxyInterceptor:
     def __init__(self):
         self.requests_path = None
 
-    def load(self, loader):
+    def load(self, loader) -> None:
         self.requests_path = getattr(ctx.options, "requests_path", None) or os.getenv("REQUESTS_PATH")
         ctx.log.info(f"[Interceptor] requests_path = {self.requests_path}")
 
@@ -26,6 +26,19 @@ class MITMProxyInterceptor:
         else:
             resp_body = f"<Binary Data: {content_type}>"
 
+        def get_resource_type(flow):
+            ct = flow.response.headers.get("Content-Type", "").lower()
+            url = flow.request.url.lower()
+            
+            if "json" in ct or "api." in url: return "fetch"
+            if "html" in ct: return "document"
+            if "css" in ct: return "stylesheet"
+            if "javascript" in ct: return "script"
+            if "image" in ct: return "image"
+            if "font" in ct: return "font"
+            if "manifest" in ct: return "manifest"
+            return "other"
+
         entry = {
             "request": {
                 "method": flow.request.method,
@@ -35,12 +48,12 @@ class MITMProxyInterceptor:
             },
             "response": {
                 "url": flow.request.url,
-                "status_code": flow.response.status_code,
+                "status": flow.response.status_code,
                 "headers": dict(flow.response.headers),
-                "body": resp_body
+                "body": resp_body,
+                "type": get_resource_type(flow)
             }
         }
-
         try:
             with open(self.requests_path, "a", encoding="utf-8") as f:
                 f.write(json.dumps(entry, ensure_ascii=False) + "\n")

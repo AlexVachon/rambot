@@ -20,10 +20,11 @@ class BasicScraper(Scraper):
         address = self.address()
         ratings = self.ratings()
         
-        reqs = self.interceptor.requests()
+        self.sleep(10)
         
-        with open("requests.json", 'w') as f:
-            json.dump(reqs, f, indent=4)
+        reqs = self.interceptor.requests(lambda r: r.resource_type not in ["image", "font", "stylesheet"])
+        main_doc = self.interceptor.requests(lambda r: r.resource_type == "document")
+        api_traffic = self.interceptor.requests(lambda r: r.resource_type == "fetch")
         
         return Restaurant(
             link=link,
