@@ -6,24 +6,32 @@ from abc import ABC, abstractmethod
 from typing import Optional, Callable, List
 
 from .scraper import IScraper
-from .request import Response, Request, Requests
+from .request import Response, Request
 
 
 class IInterceptor(ABC):
-    """Interface for a request interceptor used in web scraping."""
+    """
+    Abstract Base Class for a request interceptor used in web scraping.
+
+    An interceptor acts as a proxy that sits between the scraper and the web,
+    allowing the framework to inspect network calls (XHR, images, etc.) made
+    by the browser.
+    """
 
     _scraper: IScraper
     _requests_path: str
 
     def __init__(self, scraper: IScraper) -> None:
         """
-        Initialize the interceptor with a scraper instance.
+        Initialize the interceptor.
 
         Args:
-            scraper (IScraper): The scraper instance to use.
+            scraper (IScraper): The parent scraper instance, used to access 
+                logging and proxy configuration.
         """
         self._scraper = scraper
         self.logger = scraper.logger
+
         self._requests_path = os.path.join(
             tempfile.gettempdir(),
             f"__{self._scraper.__class__.__name__.lower()}_requests.json"
@@ -32,16 +40,19 @@ class IInterceptor(ABC):
     @abstractmethod
     def start(self) -> None:
         """
-        Start the request interceptor to capture network requests.
-        Typically launches a proxy like mitmproxy in a subprocess.
+        Start the network interception process.
+        
+        This should initialize any background processes or proxies needed
+        to capture traffic.
         """
         pass
 
     @abstractmethod
     def stop(self) -> None:
         """
-        Stop the request interceptor and clean up any resources
-        (such as temporary files or background processes).
+        Stop interception and perform cleanup.
+        
+        This should terminate background processes and delete temporary files.
         """
         pass
 
@@ -49,30 +60,27 @@ class IInterceptor(ABC):
     def requests(
         self,
         predicate: Optional[Callable[[Request], bool]] = None
-    ) -> Requests:
+    ) -> List[Request]:
         """
-        Retrieve all captured requests, optionally filtered by a predicate.
+        Retrieve captured requests.
 
         Args:
-            predicate (Optional[Callable[[Request], bool]]): 
-                A function that takes a Request object and returns True if the request
-                should be included in the result. If None, all requests are returned.
+            predicate (Optional[Callable[[Request], bool]]): Filter function.
 
         Returns:
-            Requests: List of captured Request objects that satisfy the predicate.
+            List[Request]: List of captured network objects.
         """
         pass
     
     def _requests(self) -> List[Request]:
         """
-        Read and parse the raw captured requests from the storage file.
+        Internal helper to parse captured traffic from the local storage file.
 
-        Reads the requests from the internal JSON file at self._requests_path,
-        parses each line into a Request object including its associated Response.
+        Reads the JSONL file line-by-line and reconstructs Request and Response 
+        objects. This is designed to be memory efficient for large logs.
 
         Returns:
-            List[Request]: All captured requests parsed from the storage file.
-                        Returns an empty list if the file does not exist or is empty.
+            List[Request]: Reconstructed request objects with nested responses.
         """
         if not os.path.exists(self._requests_path):
             return []
@@ -90,7 +98,7 @@ class IInterceptor(ABC):
 
                     response_obj = Response(
                         url=res_data.get("url", req_data.get("url", "")),
-                        status_code=res_data.get("status_code", 0),
+                        status=res_data.get("status", 0),
                         headers=res_data.get("headers", {}),
                         body=res_data.get("body", "")
                     )
@@ -104,6 +112,6 @@ class IInterceptor(ABC):
                     )
 
                     requests_list.append(request_obj)
-                except json.JSONDecodeError as e:
+                except json.JSONDecodeError:
                     pass
         return requests_list

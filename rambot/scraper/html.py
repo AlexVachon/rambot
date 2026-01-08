@@ -19,7 +19,15 @@ class HTML(IHTML):
             return self._driver
         return None
     
-    def find(self, query, *, by = By.XPATH, root = None, first: bool = False, timeout = 10)  -> Union[Element, List[Element]]:
+    def find(
+        self, 
+        query, 
+        *, 
+        by = By.XPATH, 
+        root = None, 
+        first: bool = False, 
+        timeout = 10
+    )  -> Element | List[Element]:
         elements = []
 
         if by == By.SELECTOR:

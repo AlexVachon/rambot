@@ -1,0 +1,18 @@
+{
+    "configurations": [
+        {
+            "name": "tests/main.py",
+            "type": "python",
+            "request": "launch",
+            "program": "tests/main.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--mode", "details",
+                "--url",
+
+                "https://www.skipthedishes.com/milestones-grill-bar-princess-st",
+                // "https://www.skipthedishes.com/cachitos",
+            ]
+        }
+    ]
+}

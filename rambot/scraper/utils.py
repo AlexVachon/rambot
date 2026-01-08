@@ -2,13 +2,14 @@ from functools import wraps
 from typing import Callable, Dict, List, Optional, Union, Type, Any, Set
 
 from .models import Document, ScrapedDocument, mode_manager
+from ..types import IScraper
 
 
 def bind(
     mode: str, 
     input: Optional[Union[str, Callable[[], List[Dict[str, Any]]]]] = None,
     save: Optional[Callable[[Any], None]] = None,
-    document_input: Optional[Type[Document]] = None,
+    document_input: Type[Document] = Document,
     enable_file_logging: bool = True,
     log_file_name: Optional[str] = None,
     log_directory: str = "."
@@ -92,20 +93,21 @@ def scrape(func: Callable[..., List[Document]]) -> Callable[..., List[Document]]
         ```
     """
     @wraps(func)
-    def wrapper(self, *args, **kwargs) -> List[Document]:
+    def wrapper(self: Type[IScraper], *args, **kwargs) -> List[Document]:
 
         def prepare_input(mode_info) -> List[Any]:
             """Prepare and return the list of inputs based on mode config."""
-            if not mode_info.input:
-                return []
-            if callable(mode_info.input):
-                return mode_info.input(self)
             if (url := getattr(self.args, "url", None)):
                 return [ScrapedDocument.from_document(
                     document=mode_info.document_input(link=url),
                     source=self.__class__.__name__,
-                    mode="restaurant_details"
+                    mode=mode_info.name
                 ).to_dict()]
+            if not mode_info.input:
+                return []
+            if callable(mode_info.input):
+                return mode_info.input(self)
+
             return self.read(filename=mode_info.input)
 
         def validate_results(items: Any) -> Set[Document]:
@@ -159,7 +161,7 @@ def scrape(func: Callable[..., List[Document]]) -> Callable[..., List[Document]]
                 mode_info.save(self, list(results))
 
             self.save(
-                links=[ScrapedDocument.from_document(document=r, mode=self.mode, source=self.__class__.__name__) for r in results]
+                data=[ScrapedDocument.from_document(document=r, mode=self.mode, source=self.__class__.__name__) for r in results]
             )
             self.close_browser()
 

@@ -1,108 +1,57 @@
-from typing import List, TypeVar, Callable, Any
+import json
+from typing import Any, Literal, Optional, Dict as TypingDict, TypeVar, Union, List
 
-class Response:
-    def __init__(self, url: str, status_code: int, headers: dict, body: str):
-        self.url = url
-        self.status_code = status_code
-        self.headers = headers
-        self._body = body
+HTTPMethod = Literal["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"]
 
-    @property
-    def text(self) -> str:
-        """Returns the response body as text."""
-        return self._body
-
-    def json(self):
-        """Parses and returns the response body as JSON."""
-        import json
+class DotDict(TypingDict[str, Any]):
+    """Base class allowing dot notation access while remaining a native dict."""
+    def __getattr__(self, name: str) -> Any:
         try:
-            return json.loads(self._body)
-        except Exception:
+            return self[name]
+        except KeyError:
+            raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{name}'")
+
+class Response(DotDict):
+    """A JSON-serializable Response supporting dot notation and autocomplete."""
+    url: str
+    status: int
+    headers: TypingDict[str, str]
+    body: str
+
+    def __init__(self, url: str, status: int, headers: TypingDict[str, str], body: str):
+        super().__init__(url=url, status=status, headers=headers, body=body)
+
+    def json(self) -> Optional[Union[TypingDict[str, Any], List[Any]]]:
+        """Parses and returns the response body as JSON."""
+        try:
+            return json.loads(self.body)
+        except (json.JSONDecodeError, TypeError):
             return None
 
-    def get_header(self, name: str, default=None):
-        """Case-insensitive header lookup."""
-        for key, value in self.headers.items():
-            if key.lower() == name.lower():
-                return value
-        return default
+class Request(DotDict):
+    """A JSON-serializable Request supporting dot notation and autocomplete."""
+    method: HTTPMethod
+    url: str
+    headers: TypingDict[str, str]
+    body: Any
+    response: Response
 
-    @property
-    def ok(self) -> bool:
-        """Returns True if the status code is between 200 and 399."""
-        return 200 <= self.status_code < 400
-
-    @property
-    def is_redirect(self) -> bool:
-        """Returns True if status code is a redirect."""
-        return self.status_code in {301, 302, 303, 307, 308}
-
-    @property
-    def encoding(self) -> str:
-        """Return encoding from headers or default to utf-8."""
-        content_type = self.get_header('Content-Type', '')
-        if 'charset=' in content_type:
-            return content_type.split('charset=')[-1]
-        return 'utf-8'
-
-    @property
-    def content(self) -> bytes:
-        """Return the response body as bytes."""
-        return self._body.encode(self.encoding)
-
-    def raise_for_status(self):
-        """Raises an HTTPError if the status code indicates an error."""
-        if not self.ok:
-            raise Exception(f"HTTP Error: Status code {self.status_code} for URL {self.url}")
-
-    def to_dict(self) -> dict:
-        return {
-            "url": self.url,
-            "status_code": self.status_code,
-            "headers": self.headers,
-            "body": self._body
-        }
-
-    def __repr__(self):
-        return f"<Response [{self.status_code}] url=\"{self.url}\">"
-
-
-class Request:
-    def __init__(self, method: str, url: str, headers: dict, body: str, response: Response):
-        self.method = method
-        self.url = url
-        self.headers = headers
-        self.body = body
-        self.response = response
-
-    def get_header(self, name: str, default=None):
-        """Case-insensitive header lookup."""
-        for key, value in self.headers.items():
-            if key.lower() == name.lower():
-                return value
-        return default
-
+    def __init__(
+        self, 
+        method: HTTPMethod, 
+        url: str, 
+        headers: TypingDict[str, str], 
+        body: str, 
+        response: Response
+    ):
+        super().__init__(
+            method=method,
+            url=url,
+            headers=headers,
+            body=body,
+            response=response
+        )
+    
     def has_body(self) -> bool:
-        """Return True if the request has a non-empty body."""
+        """Checks if the request has a non-empty body."""
         return bool(self.body)
-
-    def to_dict(self) -> dict:
-        return {
-            "method": self.method,
-            "url": self.url,
-            "headers": self.headers,
-            "body": self.body,
-            "response": self.response.to_dict()
-        }
-
-    def __repr__(self):
-        return f"<Request [{self.method}] url=\"{self.url}\">"
-    
-T = TypeVar('T', bound= 'Request')
-class Requests(List[T]):
-    def count(self) -> int:
-        return len(self)
-    
-    def map(self, func: Callable[[T], Any]) -> List[Any]:
-        """Apply a function to each request and return a list of results."""
-        return [func(req) for req in self]

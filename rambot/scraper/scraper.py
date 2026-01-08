@@ -3,8 +3,6 @@ import time
 import random
 import argparse
 
-from typing import Optional
-
 from botasaurus_driver.driver import Wait
 from ..browser.driver import Driver
 from .html import HTML
@@ -15,7 +13,7 @@ from ..types import IScraper
 
 from .utils import scrape
 from .interceptor import Interceptor
-from .models import mode_manager as mode_manager_instance, Mode
+from .models import mode_manager as mode_manager_instance, Mode, ScrapedDocument
 from .exception_handler import ExceptionHandler
 from .config import ScraperConfig
 from .exceptions import DriverError
@@ -55,8 +53,11 @@ class Scraper(IScraper):
         parser.add_argument("--mode", type=str, required=True)
         parser.add_argument("--url", type=str, required=False)
         self.args = parser.parse_args()
+        
         self.mode_manager.validate(self.args.mode)
         self.mode = self.args.mode
+        
+        self._target_url = self.args.url
         self.setup_logging(mode=self.mode_manager.get_mode(self.mode))
 
     def setup_exception_handler(self, must_raise_exceptions=[Exception]):
@@ -114,7 +115,16 @@ class Scraper(IScraper):
 
     # ---- Interceptor ----
     @property
-    def interceptor(self):
+    def interceptor(self) -> Interceptor:
+        """
+        Get the request interceptor instance.
+
+        Lazily initializes an Interceptor associated with this scraper if one 
+        does not already exist.
+
+        Returns:
+            Interceptor: The instance managing network interception for this scraper.
+        """
         if not hasattr(self, "_interceptor"):
             self._interceptor = Interceptor(scraper=self)
         return self._interceptor
@@ -248,10 +258,10 @@ class Scraper(IScraper):
 
         time.sleep(delay)
 
-    def save(self, links):
+    def save(self, data: list[ScrapedDocument]):
         try:
-            self.write(links)
-            self.logger.debug(f"Saved {len(links)} links")
+            self.write(data=data)
+            self.logger.debug(f"Saved {len(data)} document(s)")
         except Exception as e:
             self.exception_handler.handle(e)
 

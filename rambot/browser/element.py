@@ -1,9 +1,21 @@
-from typing import Optional, List
+from typing import Optional, List, Any
 
 from botasaurus_driver.driver import Wait
 from botasaurus_driver.driver import Element as BTElement, create_iframe_element
 
+
 class Element(BTElement):
+    
+    def __init__(self, driver, tab, internal_element, elem=None):
+        super().__init__(driver, tab, internal_element, elem or internal_element)
+        
+    def get(self, key: str, default: Any = None) -> Any:
+        try:
+            value = self.attrs.get(key, default)
+            return value
+        except Exception:
+            return default
+        
     @property
     def attrs(self):
         return self.attributes
@@ -28,7 +40,8 @@ class Element(BTElement):
     ) -> List["Element"]:
         elems_coro = self._elem.query_selector_all(selector, wait)
         elems = self._tab._run(elems_coro)
-        return [make_element(self._driver, self._tab, e) for e in elems]
+        
+        return [make_element(self.driver, self.tab, e) for e in elems]
     
 
 def make_element(driver, tab, internal_element):
