@@ -22,7 +22,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.x"
+          python-version: "3.12" # Pin to a stable version
 
       - name: Install Build Tools
         run: |
@@ -36,20 +36,23 @@ jobs:
           TAG_VERSION=${{ github.event.release.tag_name }}
           CLEAN_VERSION=$(echo $TAG_VERSION | sed 's/^v//')
 
-          # Configure Git user (bump2version will create a commit)
+          # Configure Git
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
-          # Ensure local branch is up-to-date before creating the version bump commit
+          # 1. Ensure we are on master and synchronized
           git fetch origin master
           git checkout master
+          
+          # 2. Rebase any changes made to master while this job was starting
           git pull --rebase origin master
 
-          # Create the version bump commit
+          # 3. Apply version bump (this creates a local commit)
+          # Note: Ensure .bumpversion.cfg or pyproject.toml is configured correctly
           bump2version --new-version $CLEAN_VERSION patch --allow-dirty
 
-          # Push the new commit to master
-          git push origin HEAD:master
+          # 4. Push the synchronized history back to master
+          git push origin master
 
       - name: Build Package
         run: python -m build
