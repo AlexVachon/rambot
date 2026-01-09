@@ -1,0 +1,37 @@
+{
+    "configurations": [
+        {
+            "name": "cities",
+            "type": "python",
+            "request": "launch",
+            "program": "tests/main.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": [
+                "--mode", "cities"
+            ]
+        },
+        {
+            "name": "listing",
+            "type": "python",
+            "request": "launch",
+            "program": "tests/main.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": [
+                "--mode", "listing"
+            ]
+        },
+        {
+            "name": "details",
+            "type": "python",
+            "request": "launch",
+            "program": "tests/main.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": [
+                "--mode", "details"
+            ]
+        }
+    ]
+}

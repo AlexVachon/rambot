@@ -1,4 +1,3 @@
-import sys
 from .utils import parse_response
 
 from ..logging_config import get_logger
@@ -7,12 +6,15 @@ from botasaurus.request import request as request_decorator, Request
 from requests.exceptions import RequestException
 
 from .exceptions import MethodError, RequestFailure, OptionsError
-from .models import ALLOWED_METHODS, RequestOptions, ResponseContent, normalize_headers
-from .decorators import no_print
+from .models import RequestOptions, normalize_headers
+from ..helpers import no_print
 
 from pydantic import HttpUrl
 
-from typing import Optional
+from typing import Optional, Literal, Union, Dict, Any
+from bs4 import BeautifulSoup
+from botasaurus_requests import Response
+
 import json
 
 logger = get_logger(__name__)
@@ -20,13 +22,13 @@ logger = get_logger(__name__)
 
 @no_print
 def request(
-    method: ALLOWED_METHODS,
+    method: Literal["GET", "POST"],
     url: HttpUrl,
     options: RequestOptions = {}, 
     max_retry: Optional[int] = 5, 
     retry_wait: Optional[int] = 5, 
-    raw: bool = False
-) -> ResponseContent:
+    parsed: bool = False
+) -> Union[Dict[str, Any], BeautifulSoup, str, Response]:
     """
     Sends an HTTP request using the specified method and options.
 
@@ -45,7 +47,7 @@ def request(
             Defaults to `False`.
 
     Returns:
-        ResponseContent: The parsed response if `raw` is `False`, otherwise the raw HTTP response.
+        Union[Dict[str, Any], BeautifulSoup, str, Response]: The parsed response if `raw` is `False`, otherwise the raw HTTP response.
 
     Raises:
         MethodError: If an unsupported HTTP method is used.
@@ -80,7 +82,7 @@ def request(
         retry_wait=retry_wait,
         output=None,
         create_error_logs=False,
-        output_formats=[ResponseContent],
+        output_formats=[Union[Dict[str, Any], BeautifulSoup, str, Response]],
         raise_exception=True,
         close_on_crash=True,
         must_raise_exceptions=[MethodError, OptionsError]
@@ -97,7 +99,7 @@ def request(
             data (RequestOptions): The options dictionary containing request parameters, headers, etc.
 
         Returns:
-            ResponseContent: The response from the server, either parsed or raw based on the `raw` flag.
+            Union[Dict[str, Any], BeautifulSoup, str, Response]: The response from the server, either parsed or raw based on the `raw` flag.
 
         Raises:
             MethodError: If an unsupported HTTP method is used.
@@ -122,7 +124,7 @@ def request(
 
             response.raise_for_status()
 
-            return response if raw else parse_response(response=response)
+            return parse_response(response=response) if parsed else response
 
         except MethodError as e:
             raise e

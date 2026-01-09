@@ -1,4 +1,4 @@
-from sqlalchemy import *
+from sqlalchemy import create_engine, MetaData
 from sqlalchemy.orm import sessionmaker
 
 from .models import BaseDocument

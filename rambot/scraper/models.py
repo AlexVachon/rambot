@@ -1,5 +1,6 @@
 import typing
-from datetime import date
+import hashlib
+from datetime import date, datetime, timezone
 
 from pydantic import BaseModel, Field, field_validator
 from enum import Enum
@@ -30,7 +31,8 @@ class Document(BaseModel):
             Computes a hash value for the document based on its link, making it hashable.
     """
 
-    link: str
+    link: str = Field("", alias="link")
+    
 
     def to_dict(self) -> typing.Dict[str, typing.Any]:
         """
@@ -107,7 +109,10 @@ class Mode(BaseModel):
     func: typing.Optional[typing.Callable] = Field(None, alias="func")
     input: typing.Optional[typing.Union[str, typing.Callable[[], typing.List[typing.Dict[str, typing.Any]]]]] = Field(None, alias="input")
     save: typing.Optional[typing.Callable[[typing.Any], None]] = Field(None, alias="save")
-    document_input: typing.Optional[typing.Type[Document]] = Field(None, alias="document_input")
+    # document_input: typing.Optional[typing.Type[Document]] = Field(None, alias="document_input")
+    
+    document_output: typing.Type[Document] = Field(Document, alias="document_output")
+    expected_input_type: typing.Optional[typing.Type] = Field(None, alias="expected_input_type")
     
     log_directory: str   = Field(".", alias="log_directory")
     enable_file_logging: bool = Field(False, alias="enable_file_logging")
@@ -150,15 +155,17 @@ class ScraperModeManager:
         _modes (dict): A dictionary holding the registered modes.
     """
     _modes = {}
+    _output_registry: typing.Dict[typing.Type[Document], str] = {}
 
     @classmethod
     def register(
-        cls, 
+        cls,
         name: str, 
-        func: typing.Optional[typing.Callable] = None, 
-        input: typing.Optional[typing.Union[str, typing.Callable[[], typing.List[typing.Dict[str, typing.Any]]]]] = None,
+        func: typing.Optional[typing.Callable] = None,
+        document_output: typing.Type[Document] = Document,
+        expected_input_type: typing.Optional[typing.Type] = None,
+        input: typing.Optional[typing.Union[str, typing.Callable]] = None,
         save: typing.Optional[typing.Callable[[typing.Any], None]] = None,
-        document_input: typing.Optional[typing.Type[Document]] = None,
         enable_file_logging: bool = False,
         log_file_name: typing.Optional[str] = None,
         log_directory: str = '.'
@@ -179,14 +186,17 @@ class ScraperModeManager:
             log_file_name (Optional[str]): The output path for logs.
             log_directory (str): The directory path for logs, defaults to the current directory.
         """
-
+        if document_output and issubclass(document_output, Document):
+            cls._output_registry[document_output] = name
+        
         if name not in cls._modes:
             cls._modes[name] = Mode(
                 name=name,
                 func=func, 
+                document_output=document_output,
+                expected_input_type=expected_input_type,
                 input=input, 
                 save=save,
-                document_input=document_input, 
                 enable_file_logging=enable_file_logging,
                 log_file_name=log_file_name,
                 log_directory=log_directory
@@ -253,6 +263,19 @@ class ScraperModeManager:
         if func is None:
             raise ValueError(f"Aucune fonction associée au mode '{mode}'")
         return func
+    
+    @classmethod
+    def get_auto_input(cls, mode_name: str) -> typing.Optional[typing.Union[str, typing.Callable]]:
+        mode = cls.get_mode(mode_name)
+        
+        if mode.input:
+            return mode.input
+            
+        if mode.expected_input_type in cls._output_registry:
+            source_mode = cls._output_registry[mode.expected_input_type]
+            return f"{source_mode}.json"
+        
+        return None
 
 
 class ModeStatus(Enum):
@@ -279,3 +302,61 @@ class ModeResult(BaseModel):
     """
     status: ModeStatus = Field(ModeStatus.ERROR, alias="status")
     message: typing.Optional[str] = Field(None, alias="message")
+
+
+class ScrapedDocument(BaseModel):
+    """
+    A model representing a scraped document, including its source, origin, unique identifier, and creation timestamp.
+    
+    Attributes:
+        source (Optional[str]): The source from which the document was scraped. Defaults to None.
+        origin (Dict[str, str]): A dictionary containing information about the origin of the document, such as the scraping mode. Defaults to an empty dictionary.
+        document (Document): The actual Document object representing the scraped content.
+        unique_id (str): A unique identifier for the document, generated using an MD5 hash of the document's link.
+        created_at (datetime): The timestamp when the document was created, defaulting to the current UTC time.
+
+    Methods:
+        generate_unique_id(cls, link: str) -> str:
+            Generates a unique MD5 hash ID for a document based on its link.
+        
+        from_document(cls, document: Document, source: str, mode: str) -> "ScrapedDocument":
+            Creates an instance of the ScrapedDocument class from a Document object.
+        
+        to_dict(self) -> Dict[str, Any]:
+            Converts the ScrapedDocument instance into a dictionary format, with the creation timestamp formatted as a string.
+    """
+    source: typing.Optional[str] = Field(None, alias="source")
+    origin: typing.Dict[str, str] = Field({}, alias="origin")
+    
+    document: Document = Field(Document(), alias="document")
+    
+    unique_id: str = Field(default_factory=lambda: hashlib.md5().hexdigest())
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    @classmethod
+    def generate_unique_id(cls, link: str) -> str:
+        return hashlib.md5(link.encode()).hexdigest()
+    
+    @classmethod
+    def from_document(
+        cls, document: Document, source: str, mode: str
+    ) -> "ScrapedDocument":
+        return cls(
+            source=source,
+            origin={"mode": mode},
+            document=document,
+            unique_id=cls.generate_unique_id(document.link),
+            created_at=datetime.now(timezone.utc)
+        )
+    
+    def to_dict(self) -> typing.Dict[str, typing.Any]:
+        return {
+            "source": self.source,
+            "origin": self.origin,
+            "document": self.document.to_dict(),
+            "unique_id": self.unique_id,
+            "created_at": self.created_at.strftime('%Y-%m-%d %H:%M:%S.%f%z')
+        }
+    
+
+mode_manager = ScraperModeManager()

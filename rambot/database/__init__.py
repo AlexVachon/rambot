@@ -1,1 +1,7 @@
-from sqlalchemy import *
+from sqlalchemy import (
+    SQLAlchemyConnection
+)
+
+__all__ = [
+    "SQLAlchemyConnection",
+]
