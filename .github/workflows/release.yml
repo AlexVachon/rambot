@@ -30,19 +30,17 @@ jobs:
 
       - name: Bump Version
         run: |
-          # Extract version from the tag (e.g., 0.1.4)
           TAG_VERSION=${{ github.event.release.tag_name }}
-          # Remove 'v' prefix if it exists
           CLEAN_VERSION=$(echo $TAG_VERSION | sed 's/^v//')
           
-          # Configure Git
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           
-          # Update version in pyproject.toml
           bump2version --new-version $CLEAN_VERSION patch --allow-dirty
           
-          git commit -am "chore: bump version to $CLEAN_VERSION"
+          git fetch origin master
+          git pull --rebase origin master
+          
           git push origin HEAD:master
 
       - name: Build Package
