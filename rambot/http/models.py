@@ -1,11 +1,6 @@
 import typing
 
-from botasaurus_requests import Response
 from typing_extensions import Literal
-from bs4 import BeautifulSoup
-
-
-ALLOWED_METHODS = Literal["GET", "POST"]
 
 
 class ProxiesOptions(typing.TypedDict, total=False):
@@ -123,5 +118,4 @@ class RequestOptions(typing.TypedDict, total=False):
     verify: typing.Optional[typing.Union[bool, str]]
     cert: typing.Optional[typing.Union[str, tuple]]
     json: typing.Optional[typing.Dict[str, typing.Any]]
-    
-ResponseContent = typing.Union[typing.Dict[str, typing.Any], BeautifulSoup, str, Response]
+
