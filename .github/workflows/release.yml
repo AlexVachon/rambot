@@ -5,53 +5,25 @@ on:
     types: [published]
 
 jobs:
-  bump-and-publish:
+  build-and-publish:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
       id-token: write
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
-          persist-credentials: true
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12" # Pin to a stable version
+          python-version: "3.12"
 
       - name: Install Build Tools
         run: |
           python -m pip install --upgrade pip
-          pip install bump2version build
-
-      - name: Bump Version
-        run: |
-          set -euo pipefail
-
-          # 1. Setup Versioning
-          TAG_VERSION=${{ github.event.release.tag_name }}
-          CLEAN_VERSION=$(echo $TAG_VERSION | sed 's/^v//')
-
-          # 2. Configure Git
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-
-          # 3. Synchronize with Master (Crucial Step)
-          git fetch origin master
-          git checkout master
-          git pull --rebase origin master
-
-          # 4. Bump the version
-          # Note: bump2version creates its own commit automatically
-          bump2version --new-version $CLEAN_VERSION patch --allow-dirty
-
-          # 5. Push the unified history
-          git push origin master
+          pip install build
 
       - name: Build Package
         run: python -m build
