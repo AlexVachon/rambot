@@ -1,17 +1,36 @@
 {
     "configurations": [
         {
-            "name": "tests/main.py",
+            "name": "cities",
             "type": "python",
             "request": "launch",
             "program": "tests/main.py",
             "console": "integratedTerminal",
+            "justMyCode": false,
             "args": [
-                "--mode", "details",
-                "--url",
-
-                "https://www.skipthedishes.com/milestones-grill-bar-princess-st",
-                // "https://www.skipthedishes.com/cachitos",
+                "--mode", "cities"
+            ]
+        },
+        {
+            "name": "listing",
+            "type": "python",
+            "request": "launch",
+            "program": "tests/main.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": [
+                "--mode", "listing"
+            ]
+        },
+        {
+            "name": "details",
+            "type": "python",
+            "request": "launch",
+            "program": "tests/main.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": [
+                "--mode", "details"
             ]
         }
     ]

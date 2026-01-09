@@ -161,7 +161,14 @@ def scrape(func: Callable[..., List[Document]]) -> Callable[..., List[Document]]
                 mode_info.save(self, list(results))
 
             self.save(
-                data=[ScrapedDocument.from_document(document=r, mode=self.mode, source=self.__class__.__name__) for r in results]
+                data=[
+                    ScrapedDocument.from_document(
+                        document=r, 
+                        mode=self.mode, 
+                        source=self.__class__.__name__
+                    ) 
+                    for r in results
+                ]
             )
             self.close_browser()
 

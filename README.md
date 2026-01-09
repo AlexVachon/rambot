@@ -1,215 +1,163 @@
-# **Rambot: Versatile Web Scraping Framework**  
+# **Rambot: Versatile Web Scraping Framework**
 
+## **Description**
 
+Rambot is a versatile and configurable web scraping framework designed to automate data extraction from web pages. It provides an intuitive structure for:
 
-## **Description**    
-Rambot is a versatile and configurable web scraping framework designed to automate data extraction from web pages. It provides an intuitive structure for:  
-- Managing different scraping modes.  
-- Automating browser navigation.  
-- Handling logs and errors.  
-- Performing advanced HTTP requests to interact with APIs.  
+* **Mode Management**: Orchestrate complex scraping workflows via a robust mode manager.
+* **Browser Automation**: High-level control of **ChromeDriver** via `botasaurus`.
+* **Network Interception**: Native integration with `mitmproxy` to capture and filter background XHR/Fetch requests.
+* **Structured Data**: Built-in Pydantic-based `Document` models for reliable data persistence.
+* **Advanced HTTP**: A standalone request module for high-speed scraping without a browser.
 
+---
 
+## **Installation**
 
-## **Installation**    
 ```bash
 pip install --upgrade rambot
 ```
 
-### **ChromeDriver Dependency**  
-Rambot uses `ChromeDriver` for automated browsing. Install it based on your operating system:  
+### **ChromeDriver Dependency**
 
-- **Windows**: [Download ChromeDriver here](https://sites.google.com/chromium.org/driver/downloads) and add it to your `PATH`.
+Rambot requires `ChromeDriver`. Install it based on your OS:
 
-- **macOS**: Install via Homebrew:  
-  ```bash
-  brew install chromedriver
-  ```
+* **macOS**: `brew install chromedriver`
+* **Linux**: `sudo apt install chromium-chromedriver`
+* **Windows**: Download from the [Chrome for Testing](https://googlechromelabs.github.io/chrome-for-testing/) page.
 
-- **Linux**:  
-  1. Install Chrome (if not already installed):
-     ```bash
-     wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
-     sudo dpkg -i google-chrome-stable_current_amd64.deb
-     sudo apt-get -f install
-     ```
+---
 
-  2. Install ChromeDriver:
-     ```bash
-     sudo apt install chromium-chromedriver
-     ```
+## **Key Features**
 
-  3. Verify Chrome installation:
-     ```bash
-     google-chrome --version
-     ```
+### **1. Network Interception & Filtering**
 
-  4. (Optional) Add Chrome to `PATH` if needed:
-     ```bash
-     export PATH=$PATH:/usr/bin
-     ```
+Capture real-time network traffic using the integrated `mitmproxy` backend.
 
-### **Verify Installation**:
-To verify that Chrome and ChromeDriver are working correctly, run the following:
-  ```bash
-  google-chrome --remote-debugging-port=9222 --headless --disable-gpu --no-sandbox
-  curl http://127.0.0.1:9222/json/version
-  ```
-You should receive a response with the version details of Chrome.
+* **Auto-categorization**: Requests are typed as `fetch`, `document`, `script`, `stylesheet`, `image`, `font`, or `manifest`.
+* **Dot Notation**: Access data cleanly: `req.response.status`, `req.url`, `req.is_fetch`.
+* **Zero-Config Export**: Directly serializable with `json.dump(self.interceptor.requests(), f)`.
 
+### **2. Chained Execution Pipeline**
 
-## **Key Features**    
-### **1. Mode-Based Execution**  
-- Supports multiple scraping modes via `ScraperModeManager`.
-- Use `@bind` decorator or `self.mode_manager.register()` to associate functions with specific modes.
+Connect different scraping phases (e.g., Search -> Details -> Download) using the `@bind` decorator. Rambot automatically handles input/output JSON files between modes.
 
-### **2. Headless Browser Control**  
-- Integrates with `botasaurus` for automation.
-- Advanced proxy management, image blocking, and extension loading.
-- Uses `ChromeDriver` to navigate and extract content.
+### **3. Optimized Performance**
 
-### **3. Optimized Data Handling**  
-- Saves extracted data in JSON format.
-- Reads and processes existing data files as input.
-- Models structured data using `Document`.
+* **Resource Management**: Easily toggle browser usage per mode to save CPU/RAM.
+* **Throttling**: Randomized `wait()` delays to mimic human behavior and avoid detection.
 
-### **4. Error Management & Logging**  
-- Centralized error handling with `ExceptionHandler`.
-- Uses `loguru` for detailed and structured logging.
+---
 
-### **5. Scraping Throttling & Delays**  
-- Introduces randomized delays to mimic human behavior (`wait()`).
-- Ensures compliance with website rate limits.
+## **Basic Scraper Example**
 
-### **6. Useful Decorators**
-- `@no_print`: Suppresses unwanted output.
-- `@scrape`: Enforces function structure in scraping processes.
-
-
-
-## **Basic Usage**    
-
-### **1. Create a Scraper**  
 ```python
-from rambot.scraper import Scraper, bind
-from rambot.scraper.models import Document
-import typing
+from rambot import Scraper, bind
+from rambot.scraper import Document
 
-class App(Scraper):
-    BASE_URL: str = "https://www.skipthedishes.com"
+class BasicScraper(Scraper):
+    BASE_URL: str = "https://www.example.com"
 
-    @bind(mode="cities")
-    def available_cities(self) -> typing.List[Document]:
-        self.get("https://www.skipthedishes.com/canada-food-delivery")
-        elements = self.find_all("h4 div a")
+    @bind(mode="listing")
+    def available_items(self) -> list[Document]:
+        self.get(f"{self.BASE_URL}/catalog")
+        links = self.find_all(".item-link")
+        
         return [
-            Document(link=self.BASE_URL + href)
-            for element in elements
-            if (href := element.get_attribute("href"))
+            Document(link=self.BASE_URL + el.get_attribute("href"))
+            for el in links
         ]
 
 if __name__ == "__main__":
-    app = App()
-    app.run()  # Executes the mode registered in launch.json
+    app = BasicScraper()
+    app.run()
 ```
 
-### **2. Configure `launch.json` in VSCode**  
+---
+
+## **Advanced Usage: Network Interceptor**
+
+Capture background API traffic while navigating. This is ideal for sites like **SkipTheDishes** that load menus via background JSON calls.
+
+```python
+from pydantic import Field
+from rambot import Scraper, bind
+from rambot.scraper import Document
+
+class ProductDoc(Document):
+    price: float = Field(0.0)
+    api_count: int = Field(0)
+
+class InterceptorScraper(Scraper):
+    @bind(mode="details", input="listing", document_input=ProductDoc)
+    def details(self, doc) -> ProductDoc:
+        self.load_page(doc.link)
+        
+        # Filter for API/Fetch calls only
+        # This catches modern Fetch API calls even without XHR headers
+        api_calls = self.interceptor.requests(lambda r: r.is_fetch)
+        
+        # Check for specific API errors
+        errors = self.interceptor.requests(lambda r: r.response.is_error)
+        
+        doc.api_count = len(api_calls)
+        return doc
+```
+
+---
+
+## **The `@bind` Decorator**
+
+| Argument | Type | Description |
+| --- | --- | --- |
+| **`mode`** | `str` | **Required.** The CLI name (e.g., `--mode details`). |
+| **`input`** | `str` | Name of the JSON file to read input from. |
+| **`document_input`** | `Type[Document]` | The Pydantic model used to parse input items. |
+| **`log_directory`** | `str` | Custom path for mode-specific logs. |
+
+---
+
+## **Configuration**
+
+### **VS Code Launch Setup**
+
+Use `.vscode/launch.json` to debug specific modes and URLs:
+
 ```json
 {
-  "version": "0.2.0",
-  "configurations": [
-    {
-      "name": "cities",
-      "type": "python",
-      "request": "launch",
-      "program": "main.py",
-      "justMyCode": false,
-      "args": ["--mode", "cities"]
-    }
-  ]
+    "configurations": [
+        {
+            "name": "Scrape Details",
+            "type": "python",
+            "request": "launch",
+            "program": "main.py",
+            "args": [
+                "--mode", "details",
+                
+                // NOTE: --url will override input in @bind
+                "--url", "https://example.com/target"
+            ]
+        }
+    ]
 }
 ```
 
-### **3. Retrieve Results**  
-Extracted data is saved in `{mode}.json`:  
-```json
-{
-  "data": [
-    {"link": "https://www.skipthedishes.com/cities/calgary"},
-    {"link": "https://www.skipthedishes.com/cities/brandon"},
-    {"link": "https://www.skipthedishes.com/cities/welland"}
-  ],
-  "run_stats": {"status": "success", "message": null}
-}
-```
+### **HTTP Request Module**
 
+For high-speed scraping without a browser:
 
-
-# **HTTP Request Module**    
-## **Description**  
-This module allows sending HTTP requests with automatic error handling, logging, and retry attempts.
-
-## **Example Usage**  
 ```python
 from rambot.http import requests
 
-response = requests.request(
-    method="GET",
-    url="http://example.com",
-    options={"headers": {"User-Agent": "CustomAgent"}, "timeout": 10},
-    max_retry=3,
-    retry_wait=2
-)
+# Automated retries and case-insensitive header handling
+response = requests.request("GET", "https://api.example.com", max_retry=3)
+data = response.json()
 ```
 
-## **Using Proxies and Custom Headers**  
-```python
-response = requests.request(
-    method="POST",
-    url="http://example.com/api",
-    options={
-        "proxies": {"http": "http://my-proxy.com:{port}", "https": "http://my-proxy.com:{port}"},
-        "json": {"key": "value"},
-        "headers": {"Authorization": "Bearer TOKEN"}
-    },
-    max_retry=5,
-    retry_wait=3
-)
-```
+---
 
-## **Usage in a Scraper**  
-```python
-from rambot.http import requests
-from rambot.scraper import Scraper, bind
-from rambot.models import Document
-import typing
+## **Pro-Tips**
 
-class App(Scraper):
-    def open(self, wait=True):
-        if self.mode in ["cities"]:
-            return  # Prevents browser from opening for this mode
-        return super().open(wait)
-
-    @bind(mode="cities")
-    def cities(self) -> typing.List[Document]:
-        response = requests.request(
-            method="GET",
-            url="https://www.skipthedishes.com/canada-food-delivery",
-            options={"timeout": 15},
-            max_retry=5,
-            retry_wait=1.25
-        )
-        elements = response.select("h4 div a")
-        return [
-            Document(link=self.BASE_URL + href)
-            for element in elements
-            if (href := element.get("href"))
-        ]
-```
-
-## **Advantages**  
-- **Scraping without a browser**: Reduces resource consumption.
-- **Retry mechanism**: Minimizes failures.
-- **Fast data extraction**: Parses HTML directly with `requests`.
-
-With Rambot, automate and optimize your data extractions efficiently! 🚀
+* **Filtering**: Use `lambda r: r.resource_type == "image"` to find specific assets.
+* **Status Handling**: Use `req.response.ok` to verify capture success.
+* **DotDict**: All captured requests inherit from `dict`, allowing `json.dump(requests, f)` with no extra code.

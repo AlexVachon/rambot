@@ -1,60 +1,90 @@
 from rambot import Scraper, bind
 from rambot.scraper import Document
 
-import json
 
 class Restaurant(Document):
     name: str
     address: str
-    ratings: float
+    reviews: int
 
+class City(Document):
+    name: str
+    province: str
 
 class BasicScraper(Scraper):
     
-    @bind("details", enable_file_logging=False)
-    def details(self, doc: Document) -> Restaurant:
-        link = doc.link
-        self.load_page(link)
-           
-        name = self.name()
-        address = self.address()
-        ratings = self.ratings()
+    def setup(self):
+        self.update_driver_config(headless=True)
+        return super().setup()
+    
+    @bind("cities")
+    def cities(self) -> list[City]:
+        self.load_page("https://www.skipthedishes.com/canada-food-delivery")
         
-        self.sleep(10)
+        results = []
         
-        reqs = self.interceptor.requests(lambda r: r.resource_type not in ["image", "font", "stylesheet"])
-        main_doc = self.interceptor.requests(lambda r: r.resource_type == "document")
-        api_traffic = self.interceptor.requests(lambda r: r.resource_type == "fetch")
+        for province_el in self.html.find_all("//h3"):
+            province = province_el.text.strip()
+            
+            city_links = self.html.find_all(
+                "./following-sibling::div[1]//h4/div/a", 
+                root=province_el
+            )
+            
+            for link_el in city_links:
+                path = link_el.attrs.get("href")
+                city_name = link_el.text.strip()
+                
+                results.append(
+                    City(
+                        link=f"https://www.skipthedishes.com{path}",
+                        name=city_name,
+                        province=province
+                    )
+                )
+                
+                if len(results) >= 3:
+                    return results
+        
+        return results
+        
+    @bind("listing", input="cities.json", document_input=City)
+    def listing(self, city: City) -> list[Document]:
+        self.load_page(city.link)
+        
+        return [
+            Document(link=f"https://www.skipthedishes.com{path}")
+            for el in self.html.find_all("//a[@data-testid='top-resto']")
+            if (path := el.attrs.get("href"))
+        ][:3]
+    
+    @bind("details", input="listing.json")
+    def details(self, listing: Document) -> Restaurant:
+        self.load_page(listing.link)
+        
+        name = self.html.find("//h1").text.strip()
+        address = self.get_address()
+        reviews = self.get_reviews()
         
         return Restaurant(
-            link=link,
             name=name,
             address=address,
-            ratings=ratings
+            reviews=reviews,
+            link=listing.link
         )
         
+    def get_address(self) -> str:
+        els = self.html.find_all('//div[@data-testid="partner-metadata-wrapper"]/div/span')
         
-    def name(self) -> str:
-        name = self.html.find("//h1", first=True).text.strip()
-        self.logger.debug(f"Name: {name}")
+        address = ", ".join([el.text.strip() for el in els])
         
-        return name
+        return address
+    
+    def get_reviews(self) -> float:
+        el = self.html.find("//span[@aria-label='Skip Score']")
+        return int(el.text.strip())
     
     
-    def address(self) -> str:
-        location = self.html.find(f"//div[@data-testid='partner-metadata-wrapper']/div/span", first=True).text.strip()
-        self.logger.debug(f"Address: {location}")
-        
-        return location
-
-
-    def ratings(self) -> float:
-        ratings = self.html.find("//span[@aria-label='Skip Score']", first=True).text.strip()
-        self.logger.debug(f"Ratings: {ratings}")
-        
-        return float(ratings)
-
-
 if __name__ == "__main__":
     app = BasicScraper()
     app.run()

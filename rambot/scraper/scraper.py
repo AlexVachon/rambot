@@ -26,9 +26,10 @@ class Scraper(IScraper):
     def __init__(self):
         self.logger = get_logger(__name__)
         self._interceptor = Interceptor(scraper=self)
-        self.setup()
+        
         self.setup_driver_config()
         self.setup_exception_handler()
+        self.setup()
 
 
     # ---- Proxy ----
@@ -140,27 +141,29 @@ class Scraper(IScraper):
     @helpers.no_print
     def open_browser(self, wait=True):
         try:
-            self.logger.debug("Opening browser ...")
+            self.logger.debug(f"Opening browser (Headless: {self.config.headless}) ...")
 
-            self._driver = Driver(**{
-                "headless": self.config.headless,
-                "proxy": self.config.proxy,
-                "profile": self.config.profile,
-                "tiny_profile": self.config.tiny_profile,
-                "block_images": self.config.block_images,
-                "block_images_and_css": self.config.block_images_and_css,
-                "wait_for_complete_page_load": wait,
-                "extensions": self.config.extensions,
-                "arguments": self.config.arguments or [
-                    "--ignore-certificate-errors",
-                    "--ignore-ssl-errors=yes"
-                ],
-                "user_agent": self.config.user_agent,
-                "lang": self.config.lang,
-                "beep": self.config.beep,
-            })
+            is_headless = bool(self.config.headless)
+            
+            self._driver = Driver(
+                headless=is_headless,
+                enable_xvfb_virtual_display=not is_headless,
+                proxy=self.config.proxy,
+                profile=self.config.profile,
+                tiny_profile=self.config.tiny_profile,
+                block_images=self.config.block_images,
+                block_images_and_css=self.config.block_images_and_css,
+                wait_for_complete_page_load=wait,
+                extensions=self.config.extensions,
+                arguments=self.config.arguments or [],
+                user_agent=self.config.user_agent,
+                lang=self.config.lang,
+                beep=self.config.beep,
+            )
+
             if not self._driver._tab:
-                raise DriverError("Can't initialize driver")
+                raise DriverError("Can't initialize driver tab")
+                
         except Exception as e:
             self.exception_handler.handle(e)
 
