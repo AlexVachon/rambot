@@ -33,25 +33,24 @@ jobs:
         run: |
           set -euo pipefail
 
+          # 1. Setup Versioning
           TAG_VERSION=${{ github.event.release.tag_name }}
           CLEAN_VERSION=$(echo $TAG_VERSION | sed 's/^v//')
 
-          # Configure Git
+          # 2. Configure Git
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
-          # 1. Ensure we are on master and synchronized
+          # 3. Synchronize with Master (Crucial Step)
           git fetch origin master
           git checkout master
-          
-          # 2. Rebase any changes made to master while this job was starting
           git pull --rebase origin master
 
-          # 3. Apply version bump (this creates a local commit)
-          # Note: Ensure .bumpversion.cfg or pyproject.toml is configured correctly
+          # 4. Bump the version
+          # Note: bump2version creates its own commit automatically
           bump2version --new-version $CLEAN_VERSION patch --allow-dirty
 
-          # 4. Push the synchronized history back to master
+          # 5. Push the unified history
           git push origin master
 
       - name: Build Package
