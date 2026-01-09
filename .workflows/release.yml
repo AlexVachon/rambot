@@ -17,6 +17,7 @@ jobs:
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
+          persist-credentials: true
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -30,19 +31,24 @@ jobs:
 
       - name: Bump Version
         run: |
-          # Extract version from the tag (e.g., 0.1.4)
+          set -euo pipefail
+
           TAG_VERSION=${{ github.event.release.tag_name }}
-          # Remove 'v' prefix if it exists
           CLEAN_VERSION=$(echo $TAG_VERSION | sed 's/^v//')
-          
-          # Configure Git
+
+          # Configure Git user (bump2version will create a commit)
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          
-          # Update version in pyproject.toml
+
+          # Ensure local branch is up-to-date before creating the version bump commit
+          git fetch origin master
+          git checkout master
+          git pull --rebase origin master
+
+          # Create the version bump commit
           bump2version --new-version $CLEAN_VERSION patch --allow-dirty
-          
-          git commit -am "chore: bump version to $CLEAN_VERSION"
+
+          # Push the new commit to master
           git push origin HEAD:master
 
       - name: Build Package
