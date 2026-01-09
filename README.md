@@ -190,14 +190,66 @@ Use `.vscode/launch.json` to debug specific modes and URLs:
 }
 ```
 
-### **HTTP Request Module**
+# **HTTP Request Module**
 
-For high-speed scraping without a browser:
+The `rambot.http` module provides a high-performance, standalone HTTP client for high-speed scraping without a browser. It is built on top of `botasaurus` and `requests`, offering automated retries, advanced header normalization, and seamless integration with browser-like configurations.
+
+---
+
+## **Core Features**
+
+* **Automated Retries**: Built-in exponential backoff and retry logic via `max_retry` and `retry_wait` parameters.
+* **Browser Impersonation**: Easily simulate specific browsers (e.g., Chrome) and operating systems (e.g., Windows).
+* **Advanced Header Handling**: Automatically normalizes headers to match browser behaviors.
+* **Response Parsing**: Automatically parses responses into structured `ResponseContent` or returns raw objects.
+* **Error Management**: Robust exception handling for network failures, unsupported methods, and invalid configurations.
+
+---
+
+## **Usage Example**
+
+For rapid data extraction when a full browser session is not required:
 
 ```python
-from rambot.http import requests
+from rambot.http import request
+from rambot import Scraper, bind
+from rambot.scraper import Document
 
-# Automated retries and case-insensitive header handling
-response = requests.request("GET", "https://api.example.com", max_retry=3)
-data = response.json()
+class BasicDoc(Document):
+    custom_data: dict
+
+class BasicScraper(Scraper):
+    def open_browser(self):
+        # Prevents browser from opening for specific mode
+        if self.mode == "basic":
+            return
+        super().open_browser()
+
+    @bind("basic")
+    def get_basic(self) -> BasicDoc:
+        json_data = requests.request("GET", "https://api.example.com/details", max_retry=3, parsed=True)
+        return BasicDoc(link="...", custom_data=json_data)
 ```
+
+---
+
+## **Function Signature: `request()`**
+
+| Argument | Type | Description | Default |
+| --- | --- | --- | --- |
+| **`method`** | `Literal["GET", "POST"]` | HTTP verb to use | *Required* |
+| **`url`** | `HttpUrl` | The target destination URL. | *Required* |
+| **`options`** | `Union[Dict[str, Any], BeautifulSoup, str, Response]` | Dictionary containing headers, proxies, data, or browser settings. | `{}` |
+| **`max_retry`** | `int` | Maximum number of attempts in case of failure. | `5` |
+| **`retry_wait`** | `int` | Delay in seconds between retry attempts. | `5` |
+| **`parsed`** | `bool` | If `False`, returns the raw response instead of a parsed object. | `False` |
+
+---
+
+## **Error Handling**
+
+The module raises specific exceptions to help you debug scraping issues:
+
+* **`MethodError`**: Raised if an unsupported HTTP method is provided.
+* **`RequestFailure`**: Raised when the request fails due to network issues or status errors.
+* **`OptionsError`**: Raised if the provided `options` dictionary contains invalid types or configurations.
