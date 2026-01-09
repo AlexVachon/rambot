@@ -80,7 +80,7 @@ class HTML(IHTML):
         """
         elements = self._execute_search(query, by, root, timeout)
         if not elements:
-            raise Exception(f"Required element not found: '{query}' using locator '{by}'")
+            return None
         return elements[0]
 
     def find_all(self, query: str, by: By = By.XPATH, root: Optional[Element] = None, timeout: int = 10) -> List[Element]:

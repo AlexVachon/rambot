@@ -42,7 +42,6 @@ class Driver(BTDriver):
         """
         self._enable_agents()
 
-        # Ensure relative XPath for scoped search
         if root is not None and not query.startswith("."):
             query = "." + query
 
@@ -59,7 +58,6 @@ class Driver(BTDriver):
                     return results
 
             except Exception:
-                # Silently retry until timeout
                 pass
 
             if time.time() - start_time >= timeout:

@@ -109,7 +109,10 @@ class Mode(BaseModel):
     func: typing.Optional[typing.Callable] = Field(None, alias="func")
     input: typing.Optional[typing.Union[str, typing.Callable[[], typing.List[typing.Dict[str, typing.Any]]]]] = Field(None, alias="input")
     save: typing.Optional[typing.Callable[[typing.Any], None]] = Field(None, alias="save")
-    document_input: typing.Optional[typing.Type[Document]] = Field(None, alias="document_input")
+    # document_input: typing.Optional[typing.Type[Document]] = Field(None, alias="document_input")
+    
+    document_output: typing.Type[Document] = Field(Document, alias="document_output")
+    expected_input_type: typing.Optional[typing.Type] = Field(None, alias="expected_input_type")
     
     log_directory: str   = Field(".", alias="log_directory")
     enable_file_logging: bool = Field(False, alias="enable_file_logging")
@@ -152,15 +155,17 @@ class ScraperModeManager:
         _modes (dict): A dictionary holding the registered modes.
     """
     _modes = {}
+    _output_registry: typing.Dict[typing.Type[Document], str] = {}
 
     @classmethod
     def register(
-        cls, 
+        cls,
         name: str, 
-        func: typing.Optional[typing.Callable] = None, 
-        input: typing.Optional[typing.Union[str, typing.Callable[[], typing.List[typing.Dict[str, typing.Any]]]]] = None,
+        func: typing.Optional[typing.Callable] = None,
+        document_output: typing.Type[Document] = Document,
+        expected_input_type: typing.Optional[typing.Type] = None,
+        input: typing.Optional[typing.Union[str, typing.Callable]] = None,
         save: typing.Optional[typing.Callable[[typing.Any], None]] = None,
-        document_input: typing.Optional[typing.Type[Document]] = None,
         enable_file_logging: bool = False,
         log_file_name: typing.Optional[str] = None,
         log_directory: str = '.'
@@ -181,14 +186,17 @@ class ScraperModeManager:
             log_file_name (Optional[str]): The output path for logs.
             log_directory (str): The directory path for logs, defaults to the current directory.
         """
-
+        if document_output and issubclass(document_output, Document):
+            cls._output_registry[document_output] = name
+        
         if name not in cls._modes:
             cls._modes[name] = Mode(
                 name=name,
                 func=func, 
+                document_output=document_output,
+                expected_input_type=expected_input_type,
                 input=input, 
                 save=save,
-                document_input=document_input, 
                 enable_file_logging=enable_file_logging,
                 log_file_name=log_file_name,
                 log_directory=log_directory
@@ -255,6 +263,19 @@ class ScraperModeManager:
         if func is None:
             raise ValueError(f"Aucune fonction associée au mode '{mode}'")
         return func
+    
+    @classmethod
+    def get_auto_input(cls, mode_name: str) -> typing.Optional[typing.Union[str, typing.Callable]]:
+        mode = cls.get_mode(mode_name)
+        
+        if mode.input:
+            return mode.input
+            
+        if mode.expected_input_type in cls._output_registry:
+            source_mode = cls._output_registry[mode.expected_input_type]
+            return f"{source_mode}.json"
+        
+        return None
 
 
 class ModeStatus(Enum):

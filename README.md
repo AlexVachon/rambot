@@ -16,6 +16,7 @@ Rambot is a versatile and configurable web scraping framework designed to automa
 
 ```bash
 pip install --upgrade rambot
+
 ```
 
 ### **ChromeDriver Dependency**
@@ -49,29 +50,84 @@ Connect different scraping phases (e.g., Search -> Details -> Download) using th
 
 ---
 
-## **Basic Scraper Example**
+## **The `@bind` Decorator**
+
+The `@bind` decorator supports **Automatic Dependency Discovery**. It "spots" connections between modes by inspecting your Python type hints, making manual configuration optional for linear workflows.
+
+### **Decorator Arguments**
+
+| Argument | Type | Description |
+| --- | --- | --- |
+| **`mode`** | `str` | **Required.** The CLI name (e.g., `--mode listing`). This also defines the output filename: `listing.json`. |
+| **`input`** | `[str \| Callable]` | **Optional.** Manual override. Can be a filename (`"cities.json"`) or a function to fetch data. |
+| **`document_output`** | `Type[Document]` | **Optional.** The class used to save results. Automatically detected from return type hints (e.g., `-> list[City]`). |
+| **`save`** | `Callable` | **Optional.** A custom function to handle data persistence for this specific mode. |
+| **`enable_file_logging`** | `bool` | If `True`, creates a dedicated log file for this mode session. |
+| **`log_directory`** | `str` | Directory where mode-specific logs are stored. Defaults to `.`. |
+
+---
+
+## **Usage Options**
+
+### **1. Automatic Discovery (The "Magic" Way)**
+
+Rambot uses an internal type registry to link modes together. If one mode returns a specific `Document` subclass and another mode expects it as an argument, Rambot connects them automatically.
 
 ```python
 from rambot import Scraper, bind
 from rambot.scraper import Document
 
+# Define specific subclasses to act as 'type keys'
+class City(Document):
+    name: str
+
 class BasicScraper(Scraper):
-    BASE_URL: str = "https://www.example.com"
+    @bind("cities")
+    def get_cities(self) -> list[City]:
+        # Registers: City -> 'cities' mode (outputs cities.json)
+        return [City(link="...", name="Vancouver")]
 
-    @bind(mode="listing")
-    def available_items(self) -> list[Document]:
-        self.get(f"{self.BASE_URL}/catalog")
-        links = self.find_all(".item-link")
-        
-        return [
-            Document(link=self.BASE_URL + el.get_attribute("href"))
-            for el in links
-        ]
-
-if __name__ == "__main__":
-    app = BasicScraper()
-    app.run()
+    @bind("listing")
+    def get_listings(self, city: City):
+        # 'listing' needs 'City', finds 'cities' mode, and loads 'cities.json'
+        self.load_page(city.link)
 ```
+
+### **2. Manual Override (For Generic Documents)**
+
+When multiple modes use the base `Document` class, you must manually specify the input file to avoid collisions.
+
+```python
+    @bind("listing", input="cities.json")
+    def listing(self, doc: Document) -> list[Document]:
+        # Explicitly read from cities.json even if return hints are generic
+        ...
+```
+
+### **3. Functional Input (Custom Fetching)**
+
+Instead of a file, you can pass a function to `input` to fetch data from a database, API, or external source.
+
+```python
+def fetch_from_db(scraper):
+    return [{"link": "https://example.com/1"}, {"link": "https://example.com/2"}]
+
+class DatabaseScraper(Scraper):
+    @bind("process", input=fetch_from_db)
+    def process_data(self, doc: Document):
+        self.load_page(doc.link)
+```
+
+---
+
+## **Execution Logic & Priority**
+
+When a mode is launched via the CLI, Rambot determines the input data using this hierarchy:
+
+1. **CLI Override**: `--url <link>` ignores all other inputs and processes that single URL.
+2. **Manual Input**: If `input` is defined in `@bind` (file or function), it is used next.
+3. **Auto-Detection**: Rambot searches the Type Registry for a mode producing the class in the method signature (e.g., `city: City`).
+4. **Empty Start**: If no input is found, the mode runs once with no positional arguments.
 
 ---
 
@@ -89,12 +145,11 @@ class ProductDoc(Document):
     api_count: int = Field(0)
 
 class InterceptorScraper(Scraper):
-    @bind(mode="details", input="listing", document_input=ProductDoc)
+    @bind(mode="details", input="listing", document_output=ProductDoc)
     def details(self, doc) -> ProductDoc:
         self.load_page(doc.link)
         
         # Filter for API/Fetch calls only
-        # This catches modern Fetch API calls even without XHR headers
         api_calls = self.interceptor.requests(lambda r: r.is_fetch)
         
         # Check for specific API errors
@@ -104,16 +159,11 @@ class InterceptorScraper(Scraper):
         return doc
 ```
 
----
+## **Pro-Tips**
 
-## **The `@bind` Decorator**
-
-| Argument | Type | Description |
-| --- | --- | --- |
-| **`mode`** | `str` | **Required.** The CLI name (e.g., `--mode details`). |
-| **`input`** | `str` | Name of the JSON file to read input from. |
-| **`document_input`** | `Type[Document]` | The Pydantic model used to parse input items. |
-| **`log_directory`** | `str` | Custom path for mode-specific logs. |
+* **Filtering**: Use `lambda r: r.resource_type == "image"` to find specific assets.
+* **Status Handling**: Use `req.response.ok` to verify capture success.
+* **DotDict**: All captured requests inherit from `dict`, allowing `json.dump(requests, f)` with no extra code.
 
 ---
 
@@ -133,8 +183,6 @@ Use `.vscode/launch.json` to debug specific modes and URLs:
             "program": "main.py",
             "args": [
                 "--mode", "details",
-                
-                // NOTE: --url will override input in @bind
                 "--url", "https://example.com/target"
             ]
         }
@@ -153,11 +201,3 @@ from rambot.http import requests
 response = requests.request("GET", "https://api.example.com", max_retry=3)
 data = response.json()
 ```
-
----
-
-## **Pro-Tips**
-
-* **Filtering**: Use `lambda r: r.resource_type == "image"` to find specific assets.
-* **Status Handling**: Use `req.response.ok` to verify capture success.
-* **DotDict**: All captured requests inherit from `dict`, allowing `json.dump(requests, f)` with no extra code.

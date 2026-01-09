@@ -1,53 +1,110 @@
 from functools import wraps
-from typing import Callable, Dict, List, Optional, Union, Type, Any, Set
+from inspect import signature, isclass
+from typing import (
+    Callable, Dict, List,
+    Optional, Union, Type,
+    Any, Set,
+    get_type_hints, get_origin, get_args
+)
 
 from .models import Document, ScrapedDocument, mode_manager
 from ..types import IScraper
 
+def _extract_doc_type(func: Callable) -> Type[Document]:
+    """Helper to find the Document subclass in '-> list[City]'"""
+    try:
+        hints = get_type_hints(func)
+        ret = hints.get('return')
+        if not ret: return Document
+
+        origin = get_origin(ret)
+        args = get_args(ret)
+        if (origin is list or origin is List) and args:
+            return args[0] if isclass(args[0]) and issubclass(args[0], Document) else Document
+            
+        # Handles direct return: -> Restaurant
+        if isclass(ret) and issubclass(ret, Document):
+            return ret
+    except: pass
+    return Document
+
 
 def bind(
-    mode: str, 
-    input: Optional[Union[str, Callable[[], List[Dict[str, Any]]]]] = None,
+    mode: str,
+    *,
+    input: Optional[Union[str, Callable]] = None,
+    document_output: Optional[Type[Document]] = None,
     save: Optional[Callable[[Any], None]] = None,
-    document_input: Type[Document] = Document,
-    enable_file_logging: bool = True,
+    enable_file_logging: bool = False,
     log_file_name: Optional[str] = None,
     log_directory: str = "."
 ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
     """
-    A decorator to register a function as a mode in the ScraperModeManager.
+    Registers a function as a scraper mode and configures its automated data pipeline.
 
-    This decorator allows binding a function to a specific mode with optional input processing, 
-    saving functionality, logging configuration, and document input type.
+    This decorator orchestrates the connection between scraping phases. It enables 
+    "Magic" auto-discovery: if a mode requires a specific Document subclass as an 
+    argument (e.g., `City`), the manager automatically identifies the mode that 
+    produces that type and links its JSON output as the input source.
 
     Args:
-        mode (str): The name of the mode to register.
-        input (Optional[Union[str, Callable]]): The input source for the mode, which can be:
-            - A string representing an input source.
+        mode (str): The CLI name for the mode (e.g., '--mode listing').
+        input (Optional[Union[str, Callable]]): The input source. Can be:
+            - A filename (e.g., 'cities.json').
             - A callable that returns a list of dictionaries.
-        save (Optional[Callable[[Any], None]]): A function to save the results of the mode.
-        document_input (Optional[Type[Document]]): The document type associated with this mode.
-        enable_file_logging (bool): Whether to enable logging for this mode.
-        log_file_name (Optional[str]): The output path for logs. If None, a default path is used.
-        log_directory (str): The directory path where logs should be stored. Defaults to the current directory.
+            - If None, Rambot uses the type hint of the first argument to 
+              auto-detect the matching output file from the Type Registry.
+        document_output (Optional[Type[Document]]): The class used to save results.
+            If None, Rambot extracts this from the return type hint (e.g., -> list[City]).
+            This class acts as a key in the Type Registry to link dependent modes.
+        save (Optional[Callable[[Any], None]]): Optional custom function to persist results.
+        enable_file_logging (bool): Whether to create a dedicated log file for this mode.
+        log_file_name (Optional[str]): Custom log filename. If None, defaults to 
+            '{mode}_{date}.log'.
+        log_directory (str): Directory for log storage. Defaults to current directory.
 
     Returns:
-        Callable: The original function, now registered as a mode.
+        Callable: The original function, registered within the ScraperModeManager.
 
-    Example:
+    Examples:
+        **Option 1: Auto-Discovery via Subclasses (Recommended)**
         ```python
-        @bind(mode="extract_data", save=my_save_function, log_directory="logs/mode_cities")
-        def extract():
-            return {"data": "example"}
+        class City(Document): name: str
+
+        @bind("cities")
+        def get_cities(self) -> list[City]:
+            return [City(link="...", name="Vancouver")]
+
+        @bind("listing")
+        def get_listings(self, city: City):
+            # 'listing' automatically reads 'cities.json' because it needs 'City'
+            self.load_page(city.link)
+        ```
+
+        **Option 2: Manual Input (For Generic Documents)**
+        ```python
+        @bind("details", input="listing.json")
+        def get_details(self, doc: Document):
+            self.load_page(doc.link)
         ```
     """
     def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
+        final_output_type = document_output or _extract_doc_type(func)
+        
+        sig = signature(func)
+        input_type = None
+        for name, param in sig.parameters.items():
+            if name != 'self' and param.annotation is not param.empty:
+                input_type = param.annotation
+                break
+            
         mode_manager.register(
             name=mode,
             func=func,
             input=input,
+            document_output=final_output_type,
+            expected_input_type=input_type,
             save=save,
-            document_input=document_input,
             enable_file_logging=enable_file_logging,
             log_file_name=log_file_name,
             log_directory=log_directory
@@ -96,19 +153,22 @@ def scrape(func: Callable[..., List[Document]]) -> Callable[..., List[Document]]
     def wrapper(self: Type[IScraper], *args, **kwargs) -> List[Document]:
 
         def prepare_input(mode_info) -> List[Any]:
-            """Prepare and return the list of inputs based on mode config."""
+            # 1. Priority: CLI URL override
             if (url := getattr(self.args, "url", None)):
-                return [ScrapedDocument.from_document(
-                    document=mode_info.document_input(link=url),
-                    source=self.__class__.__name__,
-                    mode=mode_info.name
-                ).to_dict()]
-            if not mode_info.input:
-                return []
-            if callable(mode_info.input):
-                return mode_info.input(self)
+                # Uses the detected output type for the current mode
+                return [mode_info.document_output(link=url).to_dict()]
 
-            return self.read(filename=mode_info.input)
+            # 2. Logic: Automatic input discovery based on Type Registry
+            input_source = mode_manager.get_auto_input(mode_info.name)
+
+            if not input_source:
+                return []
+            
+            if callable(input_source):
+                return input_source(self)
+
+            # Returns the data from the detected file (e.g., 'cities.json')
+            return self.read(filename=input_source)
 
         def validate_results(items: Any) -> Set[Document]:
             """Ensure returned items are a set of Documents."""
@@ -127,6 +187,7 @@ def scrape(func: Callable[..., List[Document]]) -> Callable[..., List[Document]]
         try:
             self.mode_manager.validate(self.mode)
             mode_info = self.mode_manager.get_mode(self.mode)
+            
             if mode_info.func is None:
                 raise ValueError(f"No function associated with mode '{self.mode}'")
 
@@ -137,12 +198,17 @@ def scrape(func: Callable[..., List[Document]]) -> Callable[..., List[Document]]
 
             input_list = prepare_input(mode_info)
 
+            # Check if the mode expects a positional argument (like 'city: City')
             if input_list:
                 for data in input_list:
-                    doc = self.create_document(obj=data, document=mode_info.document_input)
+                    # Use the expected type hint (City) discovered by @bind
+                    input_cls = mode_info.expected_input_type or Document
+                    doc = self.create_document(obj=data, document=input_cls)
+                    
                     self.logger.debug(f"Processing {doc}")
 
                     try:
+                        # This passes 'doc' as the required positional argument
                         result = method(doc, *args, **kwargs)
                         results.update(validate_results(result))
                     except Exception as e:
@@ -157,21 +223,23 @@ def scrape(func: Callable[..., List[Document]]) -> Callable[..., List[Document]]
             results = set()
             self.exception_handler.handle(e)
         finally:
-            if mode_info.save is not None:
-                mode_info.save(self, list(results))
+            # Ensure mode_info exists before accessing save or save logic
+            if 'mode_info' in locals():
+                if mode_info.save is not None:
+                    mode_info.save(self, list(results))
 
-            self.save(
-                data=[
-                    ScrapedDocument.from_document(
-                        document=r, 
-                        mode=self.mode, 
-                        source=self.__class__.__name__
-                    ) 
-                    for r in results
-                ]
-            )
+                self.save(
+                    data=[
+                        ScrapedDocument.from_document(
+                            document=r, 
+                            mode=self.mode, 
+                            source=self.__class__.__name__
+                        ) 
+                        for r in results
+                    ]
+                )
+            
             self.close_browser()
-
             return list(results)
 
     return wrapper
