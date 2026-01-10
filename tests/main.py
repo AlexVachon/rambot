@@ -18,9 +18,8 @@ class BasicScraper(Scraper):
     
 
     @bind("cities")
-    def cities(self, doc: Document) -> list[CityDoc]:
-        # self.load_page("https://www.skipthedishes.com/canada-food-delivery")
-        self.load_page(doc.link)
+    def cities(self) -> list[CityDoc]:
+        self.load_page("https://www.skipthedishes.com/canada-food-delivery")
         
         return [
             CityDoc(link=f"https://www.skipthedishes.com{path}")
@@ -30,7 +29,6 @@ class BasicScraper(Scraper):
         
     @bind("listing")
     def listing(self, city: CityDoc) -> list[ListingDoc]:
-        # self.logger.debug(f"Scraping listings for city: {city.name}, {city.province}")
         self.load_page(city.link)
         
         return [

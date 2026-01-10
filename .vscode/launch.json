@@ -9,8 +9,8 @@
             "justMyCode": false,
             "args": [
                 "--mode", "cities",
-                "--url",
-                "https://www.skipthedishes.com/canada-food-delivery"
+                // "--url",
+                // "https://www.skipthedishes.com/canada-food-delivery"
             ]
         },
         {
@@ -22,8 +22,8 @@
             "justMyCode": false,
             "args": [
                 "--mode", "listing",
-                "--url",
-                "https://www.skipthedishes.com/cities/chilliwack"
+                // "--url",
+                // "https://www.skipthedishes.com/cities/chilliwack"
             ]
         },
         {
@@ -35,8 +35,8 @@
             "justMyCode": false,
             "args": [
                 "--mode", "details",
-                "--url",
-                "https://www.skipthedishes.com/taco-del-mar-whatcom-rd"
+                // "--url",
+                // "https://www.skipthedishes.com/taco-del-mar-whatcom-rd"
             ]
         }
     ]
