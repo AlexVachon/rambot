@@ -147,7 +147,6 @@ class Scraper(IScraper):
             
             self._driver = Driver(
                 headless=is_headless,
-                enable_xvfb_virtual_display=not is_headless,
                 proxy=self.config.proxy,
                 profile=self.config.profile,
                 tiny_profile=self.config.tiny_profile,
