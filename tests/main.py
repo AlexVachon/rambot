@@ -1,5 +1,6 @@
 from rambot import Scraper, bind
 from rambot.scraper import Document
+from rambot.helpers import By
 
 
 class RestaurantDoc(Document):
@@ -15,13 +16,11 @@ class ListingDoc(Document):
 
 class BasicScraper(Scraper):
     
-    def setup(self):
-        self.update_driver_config(headless=True)
-        return super().setup()
-    
+
     @bind("cities")
-    def cities(self) -> list[CityDoc]:
-        self.load_page("https://www.skipthedishes.com/canada-food-delivery")
+    def cities(self, doc: Document) -> list[CityDoc]:
+        # self.load_page("https://www.skipthedishes.com/canada-food-delivery")
+        self.load_page(doc.link)
         
         return [
             CityDoc(link=f"https://www.skipthedishes.com{path}")

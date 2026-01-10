@@ -1,13 +1,13 @@
 from functools import wraps
 from inspect import signature, isclass
 from typing import (
-    Callable, Dict, List,
+    Callable, List,
     Optional, Union, Type,
     Any, Set,
     get_type_hints, get_origin, get_args
 )
 
-from .models import Document, ScrapedDocument, mode_manager
+from .models import Document, ScrapedDocument, Mode, mode_manager
 from ..types import IScraper
 
 def _extract_doc_type(func: Callable) -> Type[Document]:
@@ -152,13 +152,12 @@ def scrape(func: Callable[..., List[Document]]) -> Callable[..., List[Document]]
     @wraps(func)
     def wrapper(self: Type[IScraper], *args, **kwargs) -> List[Document]:
 
-        def prepare_input(mode_info) -> List[Any]:
-            # 1. Priority: CLI URL override
+        def prepare_input(mode_info: Mode) -> List[Any]:
             if (url := getattr(self.args, "url", None)):
-                # Uses the detected output type for the current mode
-                return [mode_info.document_output(link=url).to_dict()]
+                dummy_doc = mode_info.expected_input_type(link=url)
+                
+                return [{"document": dummy_doc.to_dict()}]
 
-            # 2. Logic: Automatic input discovery based on Type Registry
             input_source = mode_manager.get_auto_input(mode_info.name)
 
             if not input_source:
@@ -167,7 +166,6 @@ def scrape(func: Callable[..., List[Document]]) -> Callable[..., List[Document]]
             if callable(input_source):
                 return input_source(self)
 
-            # Returns the data from the detected file (e.g., 'cities.json')
             return self.read(filename=input_source)
 
         def validate_results(items: Any) -> Set[Document]:
