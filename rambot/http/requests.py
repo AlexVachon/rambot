@@ -36,7 +36,7 @@ def request(
     It wraps the request execution with error handling and logging.
 
     Args:
-        method (ALLOWED_METHODS): The HTTP method to use (e.g., "GET", "POST").
+        method (Literal["GET", "POST"]): The HTTP method to use (e.g., "GET", "POST").
         url (HttpUrl): The target URL for the HTTP request.
         options (RequestOptions, optional): The request options, such as headers, params, data, etc.
             Defaults to an empty dictionary.

@@ -1,4 +1,4 @@
-from .models import ALLOWED_METHODS
+from typing import Literal
 
 
 class BaseRequestException(Exception):
@@ -69,7 +69,7 @@ class MethodError(BaseRequestException):
         Returns:
             str: The message indicating the unsupported method and the allowed methods.
         """
-        return f"Unsupported HTTP method: '{self.method}'. Allowed methods are: [{', '.join(ALLOWED_METHODS.__args__)}]"
+        return f"Unsupported HTTP method: '{self.method}'. Allowed methods are: [{', '.join(Literal["GET", "POST"].__args__)}]"
 
 
 class OptionsError(BaseRequestException):
