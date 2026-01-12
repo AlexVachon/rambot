@@ -162,7 +162,8 @@ class Scraper(IScraper):
 
             if not self._driver._tab:
                 raise DriverError("Can't initialize driver tab")
-                
+            
+            self.load_page("https://www.google.com")
         except Exception as e:
             self.exception_handler.handle(e)
 

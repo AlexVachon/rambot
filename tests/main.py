@@ -1,6 +1,5 @@
-from rambot import Scraper, bind
+from rambot import Scraper, bind, pipeline
 from rambot.scraper import Document
-from rambot.helpers import By
 
 
 class RestaurantDoc(Document):
@@ -8,37 +7,32 @@ class RestaurantDoc(Document):
     address: str
     ratings: float
 
-class CityDoc(Document):
-    pass
 
-class ListingDoc(Document):
-    pass
-
+@pipeline("cities", "listing", "details")
 class BasicScraper(Scraper):
-    
 
     @bind("cities")
-    def cities(self) -> list[CityDoc]:
+    def cities(self):
         self.load_page("https://www.skipthedishes.com/canada-food-delivery")
         
         return [
-            CityDoc(link=f"https://www.skipthedishes.com{path}")
+            Document(link=f"https://www.skipthedishes.com{path}")
             for el in self.html.find_all("//h4/div/a")
             if (path := el.attrs.get("href"))
         ][:3]
         
     @bind("listing")
-    def listing(self, city: CityDoc) -> list[ListingDoc]:
+    def listing(self, city: Document):
         self.load_page(city.link)
         
         return [
-            ListingDoc(link=f"https://www.skipthedishes.com{path}")
+            Document(link=f"https://www.skipthedishes.com{path}")
             for el in self.html.find_all("//a[@data-testid='top-resto']")
             if (path := el.attrs.get("href"))
-        ][:3]
+        ][:1]
     
     @bind("details")
-    def details(self, listing: ListingDoc) -> RestaurantDoc:
+    def details(self, listing: Document):
         self.load_page(listing.link)
         
         name = self.html.find("//h1").text.strip()

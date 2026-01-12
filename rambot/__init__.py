@@ -8,6 +8,7 @@ from .scraper import (
     ModeResult,
     ScrapedDocument,
     bind,
+    pipeline,
     Element,
     Wait
 )
@@ -29,7 +30,7 @@ from .logging_config import (
 )
 from . import helpers
 
-__version__ = "0.1.6"
+__version__ = "0.2.1"
 __all__ = [
     "Scraper", 
     "ScraperConfig",
@@ -40,6 +41,7 @@ __all__ = [
     "ModeResult",
     "ScrapedDocument",
     "bind",
+    "pipeline",
     "Element",
     "Wait",
     

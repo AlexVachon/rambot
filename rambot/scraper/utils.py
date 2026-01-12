@@ -11,22 +11,26 @@ from .models import Document, ScrapedDocument, Mode, mode_manager
 from ..types import IScraper
 
 def _extract_doc_type(func: Callable) -> Type[Document]:
-    """Helper to find the Document subclass in '-> list[City]'"""
-    try:
-        hints = get_type_hints(func)
-        ret = hints.get('return')
-        if not ret: return Document
+    """Helper to find the Document subclass in return hints."""
+    hints = get_type_hints(func)
+    ret = hints.get('return', Document)
+    
+    origin, args = get_origin(ret), get_args(ret)
+    if origin in (list, List) and args:
+        ret = args[0]
+        
+    return ret if isclass(ret) and issubclass(ret, Document) else Document
 
-        origin = get_origin(ret)
-        args = get_args(ret)
-        if (origin is list or origin is List) and args:
-            return args[0] if isclass(args[0]) and issubclass(args[0], Document) else Document
-            
-        # Handles direct return: -> Restaurant
-        if isclass(ret) and issubclass(ret, Document):
-            return ret
-    except: pass
-    return Document
+
+def pipeline(*modes: str):
+    """
+    Class decorator to define the sequence of data flow for a Scraper.\n
+    Validates that each mode exists and that type hints are compatible.
+    """
+    def decorator(cls):
+        mode_manager.set_pipeline(*modes)
+        return cls
+    return decorator
 
 
 def bind(
@@ -151,91 +155,37 @@ def scrape(func: Callable[..., List[Document]]) -> Callable[..., List[Document]]
     """
     @wraps(func)
     def wrapper(self: Type[IScraper], *args, **kwargs) -> List[Document]:
-
-        def prepare_input(mode_info: Mode) -> List[Any]:
-            if (url := getattr(self.args, "url", None)):
-                dummy_doc = mode_info.expected_input_type(link=url)
-                
-                return [{"document": dummy_doc.to_dict()}]
-
-            input_source = mode_manager.get_auto_input(mode_info.name)
-
-            if not input_source:
-                return []
-            
-            if callable(input_source):
-                return input_source(self)
-
-            return self.read(filename=input_source)
-
-        def validate_results(items: Any) -> Set[Document]:
-            """Ensure returned items are a set of Documents."""
-            if not items:
-                return set()
-            if not isinstance(items, (list, set)):
-                items = {items}
-            else:
-                items = set(items)
-            if not all(isinstance(r, Document) for r in items):
-                raise TypeError(f"Expected List[Document], but got {type(items)} with elements {items}")
-            return items
-
+        self.mode_manager.validate(self.mode)
+        mode_info = self.mode_manager.get_mode(self.mode)
+        method = mode_info.func.__get__(self, type(self))
         results: Set[Document] = set()
 
         try:
-            self.mode_manager.validate(self.mode)
-            mode_info = self.mode_manager.get_mode(self.mode)
-            
-            if mode_info.func is None:
-                raise ValueError(f"No function associated with mode '{self.mode}'")
-
-            method = mode_info.func.__get__(self, type(self))
-            self.logger.debug(f"Running scraper mode \"{self.mode}\"")
-
             self.open_browser()
+            
+            if (url := getattr(self.args, "url", None)):
+                input_list = [{"document": {"link": url}}]
+            else:
+                source = mode_manager.get_auto_input(self.mode)
+                input_list = source(self) if callable(source) else self.read(filename=source) if source else []
 
-            input_list = prepare_input(mode_info)
-
-            # Check if the mode expects a positional argument (like 'city: City')
             if input_list:
                 for data in input_list:
-                    # Use the expected type hint (City) discovered by @bind
-                    input_cls = mode_info.expected_input_type or Document
-                    doc = self.create_document(obj=data, document=input_cls)
-                    
-                    self.logger.debug(f"Processing {doc}")
-
+                    doc = self.create_document(obj=data, document=mode_info.expected_input_type or Document)
                     try:
-                        # This passes 'doc' as the required positional argument
-                        result = method(doc, *args, **kwargs)
-                        results.update(validate_results(result))
+                        res = method(doc, *args, **kwargs)
+                        if res: results.update(res if isinstance(res, (list, set)) else {res})
                     except Exception as e:
                         self.logger.error(f"Error processing {doc}: {e}")
-
                     self.wait(1, 2)
             else:
-                result = method(*args, **kwargs)
-                results.update(validate_results(result))
+                res = method(*args, **kwargs)
+                if res: results.update(res if isinstance(res, (list, set)) else {res})
 
-        except Exception as e:
-            results = set()
-            self.exception_handler.handle(e)
         finally:
-            # Ensure mode_info exists before accessing save or save logic
-            if 'mode_info' in locals():
-                if mode_info.save is not None:
-                    mode_info.save(self, list(results))
-
-                self.save(
-                    data=[
-                        ScrapedDocument.from_document(
-                            document=r, 
-                            mode=self.mode, 
-                            source=self.__class__.__name__
-                        ) 
-                        for r in results
-                    ]
-                )
+            if results:
+                if mode_info.save: mode_info.save(self, list(results))
+                self.save(data=[ScrapedDocument.from_document(r, self.__class__.__name__, self.mode) for r in results])
             
             self.close_browser()
             return list(results)

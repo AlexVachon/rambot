@@ -10,7 +10,7 @@ from .models import (
     ModeResult,
     ScrapedDocument
 )
-from .utils import bind
+from .utils import bind, pipeline
 from botasaurus_driver.driver import (
     Element,
     Wait
@@ -26,6 +26,7 @@ __all__ = [
     "ModeResult",
     "ScrapedDocument",
     "bind",
+    "pipeline",
     "Element",
     "Wait"
 ]

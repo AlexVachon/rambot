@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "rambot"
-version = "0.1.6"
+version = "0.2.1"
 description = "Configurable web scraping framework designed to automate data extraction from web pages"
 authors = [
     { name = "Alexandre Vachon", email = "alex.vachon@outlook.com" }

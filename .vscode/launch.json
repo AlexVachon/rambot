@@ -8,9 +8,7 @@
             "console": "integratedTerminal",
             "justMyCode": false,
             "args": [
-                "--mode", "cities",
-                // "--url",
-                // "https://www.skipthedishes.com/canada-food-delivery"
+                "--mode", "cities"
             ]
         },
         {

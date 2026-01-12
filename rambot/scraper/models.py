@@ -1,8 +1,12 @@
-import typing
 import hashlib
 from datetime import date, datetime, timezone
 
 from pydantic import BaseModel, Field, field_validator
+from typing import (
+    Dict, List, Callable, Any,
+    Optional, Union,
+    Type
+)
 from enum import Enum
 
 
@@ -34,7 +38,7 @@ class Document(BaseModel):
     link: str = Field("", alias="link")
     
 
-    def to_dict(self) -> typing.Dict[str, typing.Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """
         Converts the document to a dictionary representation.
 
@@ -106,17 +110,17 @@ class Mode(BaseModel):
     """
     name: str = Field(alias="name")
     
-    func: typing.Optional[typing.Callable] = Field(None, alias="func")
-    input: typing.Optional[typing.Union[str, typing.Callable[[], typing.List[typing.Dict[str, typing.Any]]]]] = Field(None, alias="input")
-    save: typing.Optional[typing.Callable[[typing.Any], None]] = Field(None, alias="save")
+    func: Optional[Callable] = Field(None, alias="func")
+    input: Optional[Union[str, Callable[[], List[Dict[str, Any]]]]] = Field(None, alias="input")
+    save: Optional[Callable[[Any], None]] = Field(None, alias="save")
     # document_input: typing.Optional[typing.Type[Document]] = Field(None, alias="document_input")
     
-    document_output: typing.Type[Document] = Field(Document, alias="document_output")
-    expected_input_type: typing.Optional[typing.Type] = Field(None, alias="expected_input_type")
+    document_output: Type[Document] = Field(Document, alias="document_output")
+    expected_input_type: Optional[Type] = Field(None, alias="expected_input_type")
     
     log_directory: str   = Field(".", alias="log_directory")
     enable_file_logging: bool = Field(False, alias="enable_file_logging")
-    log_file_name: typing.Optional[str] = Field(None, alias="log_file_name")
+    log_file_name: Optional[str] = Field(None, alias="log_file_name")
     
     @field_validator("log_file_name", mode="before")
     @classmethod
@@ -155,19 +159,20 @@ class ScraperModeManager:
         _modes (dict): A dictionary holding the registered modes.
     """
     _modes = {}
-    _output_registry: typing.Dict[typing.Type[Document], str] = {}
+    _output_registry: Dict[Type[Document], str] = {}
+    _pipeline_order: List[str] = []
 
     @classmethod
     def register(
         cls,
         name: str, 
-        func: typing.Optional[typing.Callable] = None,
-        document_output: typing.Type[Document] = Document,
-        expected_input_type: typing.Optional[typing.Type] = None,
-        input: typing.Optional[typing.Union[str, typing.Callable]] = None,
-        save: typing.Optional[typing.Callable[[typing.Any], None]] = None,
+        func: Optional[Callable] = None,
+        document_output: Type[Document] = Document,
+        expected_input_type: Optional[Type] = None,
+        input: Optional[Union[str, Callable]] = None,
+        save: Optional[Callable[[Any], None]] = None,
         enable_file_logging: bool = False,
-        log_file_name: typing.Optional[str] = None,
+        log_file_name: Optional[str] = None,
         log_directory: str = '.'
     ):
         """
@@ -244,7 +249,7 @@ class ScraperModeManager:
         return cls._modes[mode]
 
     @classmethod
-    def get_func(cls, mode: str) -> typing.Optional[typing.Callable]:
+    def get_func(cls, mode: str) -> Optional[Callable]:
         """
         Retrieves the function associated with a mode.
 
@@ -265,17 +270,57 @@ class ScraperModeManager:
         return func
     
     @classmethod
-    def get_auto_input(cls, mode_name: str) -> typing.Optional[typing.Union[str, typing.Callable]]:
+    def get_auto_input(cls, mode_name: str) -> Optional[Union[str, Callable]]:
         mode = cls.get_mode(mode_name)
         
         if mode.input:
             return mode.input
+        
+        if mode_name in cls._pipeline_order:
+            idx = cls._pipeline_order.index(mode_name)
+            if idx > 0:
+                source = cls._pipeline_order[idx - 1]
+                return f"{source}.json"
             
         if mode.expected_input_type in cls._output_registry:
             source_mode = cls._output_registry[mode.expected_input_type]
             return f"{source_mode}.json"
         
         return None
+
+    @classmethod
+    def set_pipeline(cls, *modes: str):
+        """
+        Validates the sequence of modes and ensures data compatibility.
+        
+        This checks that:
+        1. All modes in the pipeline are registered.
+        2. The output of Mode A is a subclass of the input expected by Mode B.
+        """
+        
+        for i in range(len(modes)):
+            name = modes[i]
+            
+            if name not in cls._modes:
+                raise ValueError(f"Pipeline Error: Mode '{name}' is not registered via @bind.")
+            
+            if i < len(modes) - 1:
+                next_name = modes[i + 1]
+                
+                current_mode = cls.get_mode(name)
+                next_mode = cls.get_mode(next_name)
+                
+                out_type = current_mode.document_output
+                in_type = next_mode.expected_input_type
+                
+                if in_type and not issubclass(out_type, in_type):
+                    raise TypeError(
+                        f"Pipeline Handoff Error:\n"
+                        f"  Mode '{name}' outputs '{out_type.__name__}'\n"
+                        f"  Mode '{next_name}' expects '{in_type.__name__}'\n"
+                        f"These types are incompatible."
+                    )
+        cls._pipeline_order = list(modes)
 
 
 class ModeStatus(Enum):
@@ -301,7 +346,7 @@ class ModeResult(BaseModel):
         message (Optional[str]): An optional message related to the mode result.
     """
     status: ModeStatus = Field(ModeStatus.ERROR, alias="status")
-    message: typing.Optional[str] = Field(None, alias="message")
+    message: Optional[str] = Field(None, alias="message")
 
 
 class ScrapedDocument(BaseModel):
@@ -325,8 +370,8 @@ class ScrapedDocument(BaseModel):
         to_dict(self) -> Dict[str, Any]:
             Converts the ScrapedDocument instance into a dictionary format, with the creation timestamp formatted as a string.
     """
-    source: typing.Optional[str] = Field(None, alias="source")
-    origin: typing.Dict[str, str] = Field({}, alias="origin")
+    source: Optional[str] = Field(None, alias="source")
+    origin: Dict[str, str] = Field({}, alias="origin")
     
     document: Document = Field(Document(), alias="document")
     
@@ -348,8 +393,8 @@ class ScrapedDocument(BaseModel):
             unique_id=cls.generate_unique_id(document.link),
             created_at=datetime.now(timezone.utc)
         )
-    
-    def to_dict(self) -> typing.Dict[str, typing.Any]:
+
+    def to_dict(self) -> Dict[str, Any]:
         return {
             "source": self.source,
             "origin": self.origin,
