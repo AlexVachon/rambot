@@ -229,7 +229,7 @@ class ScraperModeManager:
             ValueError: If the mode is not registered.
         """
         if mode not in cls._modes:
-            raise ValueError(f"Mode '{mode}' non reconnu. Modes disponibles: {cls.all()}")
+            raise ValueError(f"Unrecognized '{mode}'. Available Modes: {cls.all()}")
 
     @classmethod
     def get_mode(cls, mode: str) -> Mode:
